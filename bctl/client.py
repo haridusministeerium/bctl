@@ -18,18 +18,20 @@ class Client(object):
 
     async def _open_write_socket(self, cmd: list):
         try:
-            reader, writer = await asyncio.open_unix_connection(self.conf.get('socket_path'))
+            reader, writer = await asyncio.open_unix_connection(
+                self.conf.get("socket_path")
+            )
         except FileNotFoundError:
-            self.logger.error('daemon is not running')
+            self.logger.error("daemon is not running")
             sys.exit(1)
-        logging.debug(f'sending command {cmd}')
+        logging.debug(f"sending command {cmd}")
         writer.write(json.dumps(cmd).encode())
         await writer.drain()
         writer.write_eof()
         return reader, writer
 
     async def _close_socket(self, writer):
-        logging.debug('closing the connection')
+        logging.debug("closing the connection")
         writer.close()
         await writer.wait_closed()
 
@@ -38,12 +40,12 @@ class Client(object):
 
         data = await reader.read()
         data = json.loads(data.decode())
-        self.logger.debug(f'received response {data} from daemon')
+        self.logger.debug(f"received response {data} from daemon")
         [code, *rest] = data
         outf = sys.stdout if code == 0 else sys.stderr
         for i in rest:
             # note we json-dumps so that printout is jq-parseable:
-            print(json.dumps(i, separators=(',', ':')), file=outf)
+            print(json.dumps(i, separators=(",", ":")), file=outf)
         await self._close_socket(writer)
         sys.exit(code)
 
@@ -56,4 +58,3 @@ class Client(object):
 
     def send_receive_cmd(self, cmd: list):
         asyncio.run(self._send_receive(cmd))
-
