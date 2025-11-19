@@ -42,7 +42,8 @@ class Client(object):
         [code, *rest] = data
         outf = sys.stdout if code == 0 else sys.stderr
         for i in rest:
-            print(i, file=outf)
+            # note we json-dumps so that printout is jq-parseable:
+            print(json.dumps(i, separators=(',', ':')), file=outf)
         await self._close_socket(writer)
         sys.exit(code)
 

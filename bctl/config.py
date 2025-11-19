@@ -99,7 +99,7 @@ default_conf: Conf = {
             'brightness_off': 'notification-display-brightness-off.svg'
         }
     },
-    'udev_event_debounce_sec': 3.0,  # both for debouncing & delay; have experienced missed ext. display detection w/ 1.0
+    'udev_event_debounce_sec': 3.0,  # both for debouncing & delay; have experienced missed ext. display detection w/ 1.0, but it's flimsy regardless
     'msg_consumption_window_sec': 0.1,  # can be set to 0 if no delay/window is required
     'brightness_step': 5,  # %
     'ignored_displays': [],  # either [ddcutil --brief detect] cmd "Monitor:" value, or <device> in /sys/class/backlight/<device>

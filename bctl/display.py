@@ -5,7 +5,7 @@ import aiofiles as aiof
 import aiofiles.os as aios
 from os import R_OK, W_OK
 from abc import abstractmethod, ABC
-from enum import Enum
+from enum import Enum, auto
 from typing import TypeVar
 from asyncio import Task
 from pathlib import Path
@@ -16,17 +16,17 @@ from .exceptions import ExitableErr, FatalErr
 
 
 class DisplayType(Enum):
-    INTERNAL = 1
-    EXTERNAL = 2
-    SIM = 3
+    INTERNAL = auto()
+    EXTERNAL = auto()
+    SIM = auto()
 
 
 class BackendType(Enum):
-    DDCUTIL = 1  # note this can only be backend for external displays
-    RAW = 2
-    BRILLO = 3
-    BRIGHTNESSCTL = 4
-    SIM = 5
+    DDCUTIL = auto()  # note this can only be backend for external displays
+    RAW = auto()
+    BRILLO = auto()
+    BRIGHTNESSCTL = auto()
+    SIM = auto()
 
 
 class Display(ABC):
@@ -36,7 +36,7 @@ class Display(ABC):
         self.backend: BackendType = bt
         self.conf: Conf = conf
         self.name: str = 'UNKNOWN'
-        self.brightness: int = -1  # note this holds the raw value, not necessarily %
+        self.raw_brightness: int = -1  # raw, i.e. potentially not a percentage
         self.max_brightness: int = -1
         self.min_brightness: int = 0
         self.logger: Logger = logging.getLogger(f'{type(self).__name__}.{self.id}')
@@ -55,18 +55,18 @@ class Display(ABC):
         elif value > self.max_brightness:
             value = self.max_brightness
 
-        if value != self.brightness:
+        if value != self.raw_brightness:
             self.logger.debug(f'setting display [{self.id}] brightness to {value} ({round(value/self.max_brightness*100)}%)...')
             await self._set_brightness(value)
-            self.brightness = value
+            self.raw_brightness = value
         return self.get_brightness()
 
     async def adjust_brightness(self, delta: int) -> int:
         delta = round(delta / 100 * self.max_brightness)
-        target = self.brightness + delta
+        target = self.raw_brightness + delta
 
-        if ((self.brightness == self.max_brightness and delta > 0) or
-                (self.brightness == self.min_brightness and delta < 0)):
+        if ((self.raw_brightness == self.max_brightness and delta > 0) or
+                (self.raw_brightness == self.min_brightness and delta < 0)):
             return self.get_brightness()
         elif target < self.min_brightness:
             target = self.min_brightness
@@ -75,14 +75,14 @@ class Display(ABC):
 
         self.logger.debug(f'adjusting display [{self.id}] brightness to {target} ({round(target/self.max_brightness*100)}%)...')
         await self._set_brightness(target)
-        self.brightness = target
+        self.raw_brightness = target
         return self.get_brightness()
 
     def get_brightness(self, raw:bool=False) -> int:
-        if self.brightness == -1:
+        if self.raw_brightness == -1:
             raise FatalErr(f'[{self.id}] appears to be uninitialized')
         self.logger.debug(f'getting display [{self.id}] brightness')
-        return self.brightness if raw else round(self.brightness/self.max_brightness*100)
+        return self.raw_brightness if raw else round(self.raw_brightness/self.max_brightness*100)
 
 
 # display baseclass that's not backed by ddcutil
@@ -107,7 +107,7 @@ class SimulatedDisplay(Display):
         await asyncio.sleep(3)
         if self.sim.get('failmode') == 'i':
             raise ExitableErr(f'error initializing [{self.id}]', exit_code=self.sim.get('exit_code'))
-        self.brightness = initial_brightness
+        self.raw_brightness = initial_brightness
         self.max_brightness = 100
 
     async def _set_brightness(self, value: int) -> None:
@@ -131,7 +131,7 @@ class DDCDisplay(Display):
         out, err, code = await run_cmd(cmd, throw_on_err=True, logger=self.logger)
         out = out.split()
         assert len(out) == 5, f'{cmd} output unexpected: {out}'
-        self.brightness = int(out[-2])
+        self.raw_brightness = int(out[-2])
         self.max_brightness = int(out[-1])
 
     async def _set_brightness(self, value: int) -> None:
@@ -151,7 +151,7 @@ class BCTLDisplay(NonDDCDisplay):
     def __init__(self, bctl_out: str, conf: Conf) -> None:
         out = bctl_out.split(',')
         assert len(out) == 5, f'unexpected bctl list output: [{bctl_out}]'
-        self.brightness = int(out[2])
+        self.raw_brightness = int(out[2])
         self.max_brightness = int(out[4])
         super().__init__(out[0], conf, BackendType.BRIGHTNESSCTL)
 
@@ -177,7 +177,7 @@ class BrilloDisplay(NonDDCDisplay):
             asyncio.create_task(self._get_device_attr('c'))   # min
         ]
         await wait_and_reraise(futures)
-        self.brightness = futures[0].result()
+        self.raw_brightness = futures[0].result()
         self.max_brightness = futures[1].result()
         self.min_brightness = futures[2].result()
 
@@ -209,8 +209,8 @@ class RawDisplay(NonDDCDisplay):
                 and await aios.access(self.brightness_f, W_OK)):
             raise FatalErr(f'[{self.brightness_f}] is not a file w/ RW perms')
 
-        # self.brightness = int(self.brightness_f.read_text().strip())  # non-async
-        self.brightness = await self._read_int(self.brightness_f)
+        # self.raw_brightness = int(self.brightness_f.read_text().strip())  # non-async
+        self.raw_brightness = await self._read_int(self.brightness_f)
 
         max_brightness_f = Path(self.device_dir, 'max_brightness')
         if (await aios.path.isfile(max_brightness_f)

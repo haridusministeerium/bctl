@@ -172,9 +172,9 @@ set_brightness() {
 
     val="${1%\%*}"  # strip trailing % if it was (mistakenly) given
     if [[ "$val" =~ ^[0-9]{1,3}$ ]]; then
-        val="[\"set\",$val]"
+        val="[\"set\",1,$val]"
     elif [[ "$val" =~ ^[-+][0-9]{1,3}$ ]]; then
-        val="[\"delta\",$((val))]"
+        val="[\"delta\",1,$((val))]"
     else
         echo -e "illegal brightness arg provided: [$val]" 1>&2
         return 1

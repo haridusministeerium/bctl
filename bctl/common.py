@@ -9,7 +9,7 @@ from asyncio import Task
 from logging import Logger
 from pydash import py_
 from collections.abc import Iterable, Sequence
-from .exceptions import FatalErr
+from .exceptions import FatalErr, CmdErr
 from .config import Conf, State, default_conf
 
 STATE_VER = 1  # bump this whenever persisted state data structure changes
@@ -107,7 +107,7 @@ async def run_cmd(cmd: Iterable[str] | str, throw_on_err=False, logger=None) -> 
         if logger:
             logger.error(f'{cmd} returned w/ {proc.returncode}')
         if throw_on_err:
-            raise RuntimeError(f'{cmd} returned w/ {proc.returncode}')
+            raise CmdErr(f'{cmd} returned w/ {proc.returncode}', proc.returncode, stderr.decode())
     return stdout.decode(), stderr.decode(), proc.returncode
 
 

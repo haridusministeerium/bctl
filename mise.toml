@@ -1,0 +1,6 @@
+#[tools]
+#python = "3.11" # [optional] will be used for the venv
+
+[env]
+#_.python.venv = { path = ".venv", create = true, python = "3.10" } # use a specific python version
+_.python.venv = { path = ".venv", create = true }
