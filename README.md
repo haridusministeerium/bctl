@@ -9,8 +9,9 @@ for screen (dis)connections. Desktop notifications are shown on brightness chang
 
 `$ pipx install bctl`
 
-Note this will install the client & daemon executables, but it's user
-responsibility to launch the daemon process, covered below.
+> [!NOTE]
+> This will install the client & daemon executables, but it's user responsibility
+to launch the daemon process, covered below.
 
 ## Why?
 
@@ -99,14 +100,14 @@ manager. An example of a systemd user service file (e.g.
 [Unit]
 Description=bctld aka brightness control daemon
 PartOf=graphical-session.target
-StartLimitIntervalSec=200
-StartLimitBurst=15
+StartLimitIntervalSec=90
+StartLimitBurst=5
 
 [Service]
 Type=simple
 ExecStart=%h/.local/bin/bctld
 Restart=on-failure
-RestartSec=10
+RestartSec=2
 RestartPreventExitStatus=100
 
 [Install]
@@ -168,23 +169,24 @@ Likewise, for setting brightness you might define a shell function similar to:
 #
 # @returns {void}
 set_brightness() {
-    local val
+    local msg
 
-    val="${1%\%*}"  # strip trailing % if it was (mistakenly) given
-    if [[ "$val" =~ ^[0-9]{1,3}$ ]]; then
-        val="[\"set\",1,$val]"
-    elif [[ "$val" =~ ^[-+][0-9]{1,3}$ ]]; then
-        val="[\"delta\",1,$((val))]"
+    msg="${1%\%*}"  # strip trailing % if it was (mistakenly) given
+    if [[ "$msg" =~ ^[0-9]{1,3}$ ]]; then
+        msg="[\"set\",1,$msg]"
+    elif [[ "$msg" =~ ^[-+][0-9]{1,3}$ ]]; then
+        msg="[\"delta\",1,$((msg))]"
     else
-        echo -e "illegal brightness arg provided: [$val]" 1>&2
+        echo -e "illegal brightness arg provided: [$msg]" 1>&2
         return 1
     fi
 
-    socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/bctl/bctld-ipc.sock <<< "$val"
+    socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/bctl/bctld-ipc.sock <<< "$msg"
 }
 ```
 
-Please note there will be no guarantees about the stability of this api as it's
+> [!WARNING]  
+> Please note there will be no guarantees about the stability of this api as it's
 part of internal comms spec.
 
 ## Configuration

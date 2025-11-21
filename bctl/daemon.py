@@ -12,7 +12,7 @@ from retry_deco import RetryAsync, OnErrOpts
 from logging import Logger
 from types import TracebackType
 from asyncio import AbstractEventLoop, Task, Queue, BoundedSemaphore as Semaphore
-from typing import NoReturn, Callable, Coroutine, Any
+from typing import NoReturn, Callable, Coroutine, Any, List, Sequence
 from tendo import singleton
 from pathlib import Path
 from statistics import fmean
@@ -45,7 +45,7 @@ from .config import Conf, SimConf
 from .exceptions import ExitableErr, FatalErr, PayloadErr, CmdErr, RetriableException
 from .notify import Notif
 
-DISPLAYS: list[Display]
+DISPLAYS: Sequence[Display]
 TASK_QUEUE: Queue[list]
 SEMAPHORE: Semaphore
 CONF: Conf
@@ -70,9 +70,9 @@ async def init_displays() -> None:
         return await init_displays_sim(CONF.get("sim"))
 
     LOGGER.debug("initing displays...")
-    ignore_internal = CONF.get("ignore_internal_display")
+    ignore_internal: bool = CONF.get("ignore_internal_display")
 
-    displays: list[Display]
+    displays: Sequence[Display]
     match CONF.get("main_display_ctl"):
         case "DDCUTIL":
             displays = await get_ddcutil_displays(ignore_internal)
@@ -101,7 +101,7 @@ async def init_displays() -> None:
         raise RuntimeError("more than 1 laptop/internal displays found")
 
     if displays:
-        futures: list[Task[None]] = [asyncio.create_task(d.init()) for d in displays]
+        futures: List[Task[None]] = [asyncio.create_task(d.init()) for d in displays]
         await wait_and_reraise(futures)
 
     DISPLAYS = displays
@@ -111,6 +111,8 @@ async def init_displays() -> None:
 
     if CONF.get("sync_brightness"):
         await sync_displays()
+    # TODO: is resetting last_set_brightness reasonable here? even when a new display
+    #       gets connected, doesn't it still remain our last requested brightness target?
     elif not same_values([d.get_brightness() for d in DISPLAYS]):
         CONF.get("state")["last_set_brightness"] = -1  # reset, as potentially newly added display could have a different value
 
@@ -120,7 +122,7 @@ async def init_displays() -> None:
 async def sync_displays() -> None:
     if len(DISPLAYS) <= 1:
         return
-    values: list[int] = [d.get_brightness() for d in DISPLAYS]
+    values: List[int] = [d.get_brightness() for d in DISPLAYS]
     if same_values(values):
         return
 
@@ -146,9 +148,7 @@ async def sync_displays() -> None:
                         )
                         return
                 else:
-                    raise FatalErr(
-                        f"misconfigured brightness sync strategy [{strat}]; should start with [{prefix}] prefix"
-                    )
+                    raise FatalErr(f"misconfigured brightness sync strategy [{strat}]")
 
     LOGGER.debug(f"syncing brightnesses at {target}%")
     await TASK_QUEUE.put(["set", True, target])
@@ -160,11 +160,11 @@ async def init_displays_sim(sim) -> None:
     ndisplays: int = sim.get("ndisplays")
 
     LOGGER.debug(f"initing {ndisplays} simulated displays...")
-    displays: list[SimulatedDisplay] = [
+    displays: List[SimulatedDisplay] = [
         SimulatedDisplay(f"sim-{i}", CONF) for i in range(ndisplays)
     ]
 
-    futures: list[Task[None]] = [
+    futures: List[Task[None]] = [
         asyncio.create_task(d.init(sim.get("initial_brightness"))) for d in displays
     ]
     await wait_and_reraise(futures)
@@ -194,21 +194,21 @@ async def resolve_single_internal_display_raw() -> RawDisplay:
 
 
 def _filter_by_backend_type(
-    displays: list[TDisplay], bt: BackendType
-) -> list[TDisplay]:
+    displays: List[TDisplay], bt: BackendType
+) -> List[TDisplay]:
     return list(filter(lambda d: d.backend == bt, displays))
 
 
 def _filter_by_display_type(
-    displays: list[TDisplay], dt: DisplayType
-) -> list[TDisplay]:
+    displays: List[TDisplay], dt: DisplayType
+) -> List[TDisplay]:
     return list(filter(lambda d: d.type == dt, displays))
 
 
 def _filter_internal_display(
-    disp: list[TNonDDCDisplay], provider: BackendType
+    disp: List[TNonDDCDisplay], provider: BackendType
 ) -> TNonDDCDisplay:
-    displays: list[TNonDDCDisplay] = _filter_by_display_type(disp, DisplayType.INTERNAL)
+    displays: List[TNonDDCDisplay] = _filter_by_display_type(disp, DisplayType.INTERNAL)
     assert len(displays) == 1, (
         f"found {len(displays)} laptop/internal displays w/ {provider}, expected 1"
     )
@@ -225,19 +225,19 @@ async def resolve_single_internal_display_bctl() -> BCTLDisplay:
     return _filter_internal_display(d, BackendType.BRIGHTNESSCTL)
 
 
-async def get_raw_displays() -> list[RawDisplay]:
-    device_dirs: list[str] = glob.glob(CONF.get("raw_device_dir") + "/*")
-    assert len(device_dirs) > 0, f"no backlight-capable raw devices found"
+async def get_raw_displays() -> List[RawDisplay]:
+    device_dirs: List[str] = glob.glob(CONF.get("raw_device_dir") + "/*")
+    assert len(device_dirs) > 0, "no backlight-capable raw devices found"
 
     return [
         RawDisplay(d, CONF) for d in device_dirs if await aios.path.exists(d)
     ]  # exists() check to deal with dead symlinks
 
 
-async def get_brillo_displays() -> list[BrilloDisplay]:
+async def get_brillo_displays() -> List[BrilloDisplay]:
     out, err, code = await run_cmd(["brillo", "-Ll"], throw_on_err=True, logger=LOGGER)
     out = out.splitlines()
-    assert len(out) > 0, f"no backlight-capable devices found w/ brillo"
+    assert len(out) > 0, "no backlight-capable devices found w/ brillo"
 
     return [
         BrilloDisplay(os.path.basename(i), CONF)
@@ -246,11 +246,11 @@ async def get_brillo_displays() -> list[BrilloDisplay]:
     ]  # exists() check to deal with dead symlinks
 
 
-async def get_bctl_displays() -> list[BCTLDisplay]:
+async def get_bctl_displays() -> List[BCTLDisplay]:
     cmd = ["brightnessctl", "--list", "--machine-readable", "--class=backlight"]
     out, err, code = await run_cmd(cmd, throw_on_err=True, logger=LOGGER)
     out = out.splitlines()
-    assert len(out) > 0, f"no backlight-capable devices found w/ brightnessctl"
+    assert len(out) > 0, "no backlight-capable devices found w/ brightnessctl"
 
     return [
         BCTLDisplay(i, CONF)
@@ -259,9 +259,9 @@ async def get_bctl_displays() -> list[BCTLDisplay]:
     ]  # exists() check to deal with dead symlinks
 
 
-async def get_ddcutil_displays(ignore_internal) -> list[Display]:
+async def get_ddcutil_displays(ignore_internal: bool) -> List[Display]:
     bus_path_prefix = CONF.get("ddcutil_bus_path_prefix")
-    displays: list[Display] = []
+    displays: List[Display] = []
     in_invalid_block = False
     d: DDCDisplay | None = None
     out, err, code = await run_cmd(
@@ -311,9 +311,8 @@ async def get_ddcutil_displays(ignore_internal) -> list[Display]:
         elif line.startswith("Display "):
             d = DDCDisplay(line.strip(), CONF)
         elif line == "Invalid display" and not ignore_internal:
-            in_invalid_block = (
-                True  # start processing one of the 'Invalid display' blocks
-            )
+            # start processing one of the 'Invalid display' blocks:
+            in_invalid_block = True
     if d:  # sanity
         raise FatalErr(f"display [{d.id}] defined but not finalized")
     return displays
@@ -322,19 +321,19 @@ async def get_ddcutil_displays(ignore_internal) -> list[Display]:
 async def display_op[T](
     op: Callable[[Display], Coroutine[Any, Any, T]],
     disp_filter: Callable[[Display], bool] = lambda _: True,
-) -> tuple[list[Task[T]], list[Display]]:
+) -> tuple[List[Task[T]], List[Display]]:
     displays = list(filter(disp_filter, DISPLAYS))
     if not displays:
         raise PayloadErr(
             "no displays for given filter found",
             [1, "no displays for given filter found"],
         )
-    futures: list[Task[T]] = [asyncio.create_task(op(d)) for d in displays]
+    futures: List[Task[T]] = [asyncio.create_task(op(d)) for d in displays]
     await wait_and_reraise(futures)
     return futures, displays
 
 
-async def execute_tasks(tasks: list[list]) -> None:
+async def execute_tasks(tasks: List[list]) -> None:
     delta = 0
     target: int | None = None
     init_retry: None | RetryAsync = None
@@ -423,15 +422,11 @@ async def execute_tasks(tasks: list[list]) -> None:
         # return
     #}
 
-    brightnesses: list[int] = sorted([f.result() for f in futures])
-    if (
-        abs(brightnesses[0] - brightnesses[-1]) <= 2
-    ):  # brightness values' extremes differ max by 2%
+    brightnesses: List[int] = sorted([f.result() for f in futures])
+    if (abs(brightnesses[0] - brightnesses[-1]) <= 2):
         CONF.get("state")["last_set_brightness"] = brightnesses[0]
-
     if notify:
         await NOTIF.notify_change(brightnesses[0])
-
     if CONF.get("sync_brightness"):
         await sync_displays()
 
@@ -439,7 +434,7 @@ async def execute_tasks(tasks: list[list]) -> None:
 async def process_q() -> NoReturn:
     consumption_window: float = CONF.get("msg_consumption_window_sec")
     while True:
-        tasks: list[list] = []
+        tasks: List[list] = []
         t: list = await TASK_QUEUE.get()
         tasks.append(t)
         while True:
@@ -473,6 +468,16 @@ def handle_failure_after_retries(e: Exception):
 async def process_client_commands() -> None:
     init_displays_retry_handler = get_retry(2, 0.3, True)
 
+    # this wrapper is so exceptions from serve_forever() callbacks (which are not
+    # awaited on) get propagated up to our taskgroup.
+    async def wrapped_client_connected_cb(*args):
+        try:
+            return await process_client_command(*args)
+        except Exception as error:
+            err_event.err = error
+            err_event.set()
+            raise
+
     async def process_client_command(reader, writer):
         async def _send_response(payload: list):
             response = json.dumps(payload, separators=(",", ":"))
@@ -487,7 +492,7 @@ async def process_client_commands() -> None:
             op: Callable[[Display], Coroutine[Any, Any, T]],
             disp_filter: Callable[[Display], bool],
             payload_creator: Callable[
-                [list[Task[T]], list[Display]], list[int | str]
+                [List[Task[T]], List[Display]], List[int | str]
             ] = lambda *_: [0],
         ):
             futures, displays = await display_op(op, disp_filter)
@@ -555,7 +560,7 @@ async def process_client_commands() -> None:
                     )
                     return
             case _:
-                LOGGER.debug(f"placing task in queue...")
+                LOGGER.debug("placing task in queue...")
                 await TASK_QUEUE.put(data)
                 return
         await _send_response(payload)
@@ -585,7 +590,7 @@ async def terminate():
 
 # note raw values only make sense when asked for individual displays, as
 # we can't really collate them into a single value as the scales potentially differ
-def get_brightness(individual: bool, raw: bool) -> list[str | int | list[str | int]]:
+def get_brightness(individual: bool, raw: bool) -> List[str | int | List[str | int]]:
     if not DISPLAYS:
         return []
     elif individual:
@@ -593,14 +598,14 @@ def get_brightness(individual: bool, raw: bool) -> list[str | int | list[str | i
         return [[d.id, d.get_brightness(raw)] for d in DISPLAYS]
 
     # either ignore last_set_brightness... {
-    # values: list[int] = [d.get_brightness(raw) for d in DISPLAYS]
+    # values: List[int] = [d.get_brightness(raw) for d in DISPLAYS]
     # if same_values(values):
         # val = values[0]
     # else:
     # } ...or use it: {
     val: int = CONF.get("state").get("last_set_brightness")
     if val == -1:  # i.e. we haven't explicitly set it to anything yet
-        values: list[int] = [d.get_brightness(raw) for d in DISPLAYS]
+        values: List[int] = [d.get_brightness(raw) for d in DISPLAYS]
     #}
         match CONF.get("get_strategy"):
             case "MEAN":
@@ -665,6 +670,16 @@ async def run() -> None:
         LOGGER.debug(f"{type(ee).__name__} caught, exiting with code {exit_code}...")
         await NOTIF.notify_err(ee)
         sys.exit(exit_code)
+    except* SystemExit:
+        raise
+    except* Exception as exc_group:
+        LOGGER.error("caught following unhandled errors in exc_group:")
+        for i, e in enumerate(exc_group.exceptions):
+            LOGGER.error(f"{i}.: {e}")
+            await NOTIF.notify_err(e)
+        sys.exit(1)
+    finally:
+        await write_state(CONF)
 
 
 # top-level err handler that's caught for stuff ran prior to task group.

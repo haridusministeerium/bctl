@@ -35,7 +35,7 @@ class Display(ABC):
         self.type: DisplayType = dt
         self.backend: BackendType = bt
         self.conf: Conf = conf
-        self.name: str = "UNKNOWN"
+        self.name: str = "UNKNOWN"  # for ddcutil detect, it's the 'Monitor:' value
         self.raw_brightness: int = -1  # raw, i.e. potentially not a percentage
         self.max_brightness: int = -1
         self.min_brightness: int = 0

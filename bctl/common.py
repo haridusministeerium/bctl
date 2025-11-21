@@ -8,7 +8,7 @@ from datetime import datetime
 from asyncio import Task
 from logging import Logger
 from pydash import py_
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from .exceptions import FatalErr, CmdErr
 from .config import Conf, State, default_conf
 
@@ -64,8 +64,8 @@ async def write_state(conf: Conf) -> None:
         async with aiof.open(statef, mode="w") as f:
             await f.write(payload)
         LOGGER.debug("...state stored")
-    except IOError as e:
-        raise e
+    except IOError:
+        raise
 
 
 def _read_dict_from_file(file_loc: str) -> dict:
@@ -75,7 +75,7 @@ def _read_dict_from_file(file_loc: str) -> dict:
     try:
         with open(file_loc, "r") as f:
             return json.load(f)
-    except Exception as e:
+    except Exception:
         LOGGER.error(f"error trying to parse json from {file_loc}")
         return {}
 
@@ -89,9 +89,9 @@ def same_values(s: Sequence):
 
 
 async def run_cmd(
-    cmd: Iterable[str] | str, throw_on_err=False, logger=None
+    cmd: Sequence[str], throw_on_err=False, logger=None
 ) -> tuple[str, str, int | None]:
-    if type(cmd) == str:
+    if isinstance(cmd, str):
         cmd = cmd.split()
 
     proc = await asyncio.create_subprocess_exec(
@@ -117,7 +117,7 @@ def assert_cmd_exist(cmd: str) -> None:
 # convenience method for waiting for futures' completion. it was created so any
 # exceptions thrown in coroutines would be propagated up, and not swallowed.
 # looks like task cancellation is the key for this, at least w/ return_when=asyncio.FIRST_EXCEPTION
-async def wait_and_reraise(futures: Iterable[Task]) -> None:
+async def wait_and_reraise(futures: Sequence[Task]) -> None:
     try:
         done, tasks_to_cancel = await asyncio.wait(
             futures, timeout=5, return_when=asyncio.FIRST_EXCEPTION
