@@ -11,7 +11,7 @@ import glob
 from retry_deco import RetryAsync, OnErrOpts
 from logging import Logger
 from types import TracebackType
-from asyncio import AbstractEventLoop, Task, Queue, BoundedSemaphore as Semaphore
+from asyncio import AbstractEventLoop, Task, Queue, Lock
 from typing import NoReturn, Callable, Coroutine, Any, List, Sequence
 from tendo import singleton
 from pathlib import Path
@@ -47,7 +47,7 @@ from .notify import Notif
 
 DISPLAYS: Sequence[Display] = []
 TASK_QUEUE: Queue[list]
-SEMAPHORE: Semaphore
+LOCK: Lock
 CONF: Conf
 LOGGER: Logger = logging.getLogger(__name__)
 NOTIF: Notif
@@ -443,7 +443,7 @@ async def process_q() -> NoReturn:
                 tasks.append(t)
             except TimeoutError:
                 break
-        async with SEMAPHORE:
+        async with LOCK:
             await execute_tasks(tasks)
 
 
@@ -507,14 +507,14 @@ async def process_client_commands(err_event) -> None:
         payload = [1]
         match data:
             case ["get", individual, raw]:
-                async with SEMAPHORE:
+                async with LOCK:
                     with suppress(RetriableException):
                         payload = [0, *get_brightness(individual, raw)]
             case ["setvcp", retry, sleep, *params]:
                 r = get_retry(
                     retry, sleep, handle_failure_after_retries, init_displays_retry
                 )
-                async with SEMAPHORE:
+                async with LOCK:
                     payload = await r(
                         disp_op,
                         lambda d: d._set_vcp_feature(*params),
@@ -526,7 +526,7 @@ async def process_client_commands(err_event) -> None:
                     retry, sleep, handle_failure_after_retries, init_displays_retry
                 )
 
-                async with SEMAPHORE:
+                async with LOCK:
                     payload = await r(
                         disp_op,
                         lambda d: d._get_vcp_feature(*params),
@@ -543,7 +543,7 @@ async def process_client_commands(err_event) -> None:
                 r = get_retry(
                     retry, sleep, handle_failure_after_retries, init_displays_retry
                 )
-                async with SEMAPHORE:
+                async with LOCK:
                     payload = await r(
                         disp_op,
                         lambda d: d.set_brightness(params[d.id]),
@@ -552,7 +552,7 @@ async def process_client_commands(err_event) -> None:
             case ["set_for_async", params]:
                 # TODO: consider passing OnErrOpts.RUN_ON_LAST_TRY to retry opts; with that we might even change to retries=0
                 r = get_retry(1, 0.5, True, init_displays_retry)
-                async with SEMAPHORE:
+                async with LOCK:
                     await r(
                         display_op,
                         lambda d: d.set_brightness(params[d.id]),
@@ -702,17 +702,17 @@ def root_exception_handler(
 
 
 def main(debug=False, sim_conf: SimConf | None = None) -> None:
-    global LOCK
+    global SINGLETON_LOCK
     global TASK_QUEUE
-    global SEMAPHORE
+    global LOCK
     global CONF
     global NOTIF
 
     # sys.excepthook = root_exception_handler
 
-    LOCK = singleton.SingleInstance()
+    SINGLETON_LOCK = singleton.SingleInstance()
     TASK_QUEUE = asyncio.Queue()
-    SEMAPHORE = Semaphore(1)
+    LOCK = Lock()
 
     CONF = load_config(load_state=True)
     CONF["sim"] = sim_conf
