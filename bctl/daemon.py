@@ -130,29 +130,36 @@ async def sync_displays() -> None:
     if target == -1:  # i.e. we haven't explicitly set it to anything yet
         d: Display | None = None
         strat = CONF.get("sync_strategy")
-        match strat:
-            case "MEAN":
-                target = int(fmean(values))
-            case "LOW":
-                target = min(values)
-            case "HIGH":
-                target = max(values)
-            case "INTERNAL":
-                d = next((d for d in DISPLAYS if d.type == DisplayType.INTERNAL), None)
-            case "EXTERNAL":
-                d = next((d for d in DISPLAYS if d.type == DisplayType.EXTERNAL), None)
-            case _:
-                prefix = "MODEL:"
-                if strat.startswith(prefix):
-                    d = next((d for d in DISPLAYS if d.name == strat[strat.find(prefix) + len(prefix):]), None)
-                else:
-                    raise FatalErr(f"misconfigured brightness sync strategy [{strat}]")
+        for s in strat:
+            match s:
+                case "MEAN":
+                    target = int(fmean(values))
+                    break
+                case "LOW":
+                    target = min(values)
+                    break
+                case "HIGH":
+                    target = max(values)
+                    break
+                case "INTERNAL":
+                    d = next((d for d in DISPLAYS if d.type == DisplayType.INTERNAL), None)
+                    if d: break
+                case "EXTERNAL":
+                    d = next((d for d in DISPLAYS if d.type == DisplayType.EXTERNAL), None)
+                    if d: break
+                case _:
+                    prefix = "MODEL:"
+                    if s.startswith(prefix):
+                        d = next((d for d in DISPLAYS if d.name == s[s.find(prefix) + len(prefix):]), None)
+                        if d: break
+                    else:
+                        raise FatalErr(f"misconfigured brightness sync strategy [{s}]")
 
         if d is not None:
             target = d.get_brightness()
         elif target == -1:
             LOGGER.info(
-                f"cannot sync brightnesses as target display [{strat}] is not connected/detected"
+                f"cannot sync brightnesses as no displays detected for sync strategy [{strat}]"
             )
             return
 

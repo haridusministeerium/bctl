@@ -44,7 +44,7 @@ class Conf(TypedDict):
     udev_event_debounce_sec: float
     periodic_init_sec: int
     sync_brightness: bool
-    sync_strategy: str
+    sync_strategy: list[str]
     get_strategy: str
     notify: NotifyConf
     msg_consumption_window_sec: float
@@ -85,13 +85,14 @@ default_conf: Conf = {
     "udev_event_debounce_sec": 3.0,  # both for debouncing & delay; have experienced missed ext. display detection w/ 1.0, but it's flimsy regardless
     "periodic_init_sec": 0,  # periodically re-init/re-detect monitors; 0 to disable
     "sync_brightness": False,  # keep all displays' brightnesses at same value/synchronized
-    "sync_strategy": "MEAN",  # if displays' brightnesses differ and are synced, what value to sync them to; only active if sync_brightness=True;
-                              # - MEAN = set to arithmetic mean
-                              # - LOW = set to lowest
-                              # - HIGH = set to highest
-                              # - INTERNAL = set to the internal screen value
-                              # - EXTERNAL = set to _a_ external screen value
-                              # - MODEL:<model> = set to <model> screen value; <model> being [ddcutil --brief detect] cmd "Monitor:" value
+    "sync_strategy": ["MEAN"],  # if displays' brightnesses differ and are synced, what value to sync them to; only active if sync_brightness=True;
+                                # first matched strategy is used, i.e. can define as ["MODEL:AUS:PA278QV:L9GMQA215221", "INTERNAL", "MEAN"]
+                                # - MEAN = set to arithmetic mean
+                                # - LOW = set to lowest
+                                # - HIGH = set to highest
+                                # - INTERNAL = set to the internal screen value
+                                # - EXTERNAL = set to _a_ external screen value
+                                # - MODEL:<model> = set to <model> screen value; <model> being [ddcutil --brief detect] cmd "Monitor:" value
     "get_strategy": "MEAN",  # if displays' brightnesses differ and are queried (via get command), what single value to return to represent current brightness level;
                              # 'MEAN' = return arithmetic mean, 'LOW' = return lowest, 'HIGH' = return highest
     "notify": {
