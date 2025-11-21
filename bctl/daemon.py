@@ -621,6 +621,9 @@ def get_brightness(individual: bool, raw: bool) -> List[str | int | List[str | i
 
 async def periodic_init(period: int) -> NoReturn:
     delta_threshold_sec = period - 1 - CONF.get("msg_consumption_window_sec")
+    if delta_threshold_sec <= 0:
+        raise FatalErr("[periodic_init_sec] value too low")
+
     while True:
         await asyncio.sleep(period)
         if unix_time_now() - LAST_INIT_TIME >= delta_threshold_sec:
