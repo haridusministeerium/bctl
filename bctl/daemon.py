@@ -595,14 +595,14 @@ def get_brightness(individual: bool, raw: bool) -> List[str | int | List[str | i
         return [[d.id, d.get_brightness(raw)] for d in DISPLAYS]
 
     # either ignore last_set_brightness... {
-    # values: List[int] = [d.get_brightness(raw) for d in DISPLAYS]
+    # values: List[int] = [d.get_brightness() for d in DISPLAYS]
     # if same_values(values):
         # val = values[0]
     # else:
     # } ...or use it: {
     val: int = CONF.get("state").get("last_set_brightness")
     if val == -1:  # i.e. we haven't explicitly set it to anything yet
-        values: List[int] = [d.get_brightness(raw) for d in DISPLAYS]
+        values: List[int] = [d.get_brightness() for d in DISPLAYS]
     #}
         match CONF.get("get_strategy"):
             case "MEAN":
