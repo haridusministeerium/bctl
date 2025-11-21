@@ -45,7 +45,7 @@ from .config import Conf, SimConf
 from .exceptions import ExitableErr, FatalErr, PayloadErr, CmdErr, RetriableException
 from .notify import Notif
 
-DISPLAYS: Sequence[Display]
+DISPLAYS: Sequence[Display] = []
 TASK_QUEUE: Queue[list]
 SEMAPHORE: Semaphore
 CONF: Conf
@@ -423,7 +423,7 @@ async def execute_tasks(tasks: List[list]) -> None:
     #}
 
     brightnesses: List[int] = sorted([f.result() for f in futures])
-    if (abs(brightnesses[0] - brightnesses[-1]) <= 2):
+    if abs(brightnesses[0] - brightnesses[-1]) <= 2:
         CONF.get("state")["last_set_brightness"] = brightnesses[0]
     if notify:
         await NOTIF.notify_change(brightnesses[0])
@@ -465,7 +465,7 @@ def handle_failure_after_retries(e: Exception):
     return [1, str(e)]
 
 
-async def process_client_commands() -> None:
+async def process_client_commands(err_event) -> None:
     init_displays_retry_handler = get_retry(2, 0.3, True)
 
     # this wrapper is so exceptions from serve_forever() callbacks (which are not
@@ -508,7 +508,7 @@ async def process_client_commands() -> None:
         match data:
             case ["get", individual, raw]:
                 async with SEMAPHORE:
-                    with suppress(Exception):
+                    with suppress(RetriableException):
                         payload = [0, *get_brightness(individual, raw)]
             case ["setvcp", retry, sleep, *params]:
                 r = get_retry(
@@ -566,7 +566,7 @@ async def process_client_commands() -> None:
         await _send_response(payload)
 
     server = await asyncio.start_unix_server(
-        process_client_command, CONF.get("socket_path")
+        wrapped_client_connected_cb, CONF.get("socket_path")
     )
     await server.serve_forever()
 
@@ -631,15 +631,22 @@ async def periodic_init(period: int) -> NoReturn:
             await TASK_QUEUE.put(["init", 1, 0.5])
 
 
+async def catch_err(err_event) -> None:
+    await err_event.wait()
+    raise err_event.err
+
+
 async def run() -> None:
     try:
         validate_ext_deps()
         init_displays_retry_handler = get_retry(5, 0.8)
         await init_displays_retry_handler(init_displays)
+        err_event = asyncio.Event()
 
         async with asyncio.TaskGroup() as tg:
             tg.create_task(process_q())
-            tg.create_task(process_client_commands())
+            tg.create_task(catch_err(err_event))
+            tg.create_task(process_client_commands(err_event))
             if CONF.get("monitor_udev"):
                 debounced = Debouncer(delay=CONF.get("udev_event_debounce_sec"))
                 f = partial(debounced, TASK_QUEUE.put, ["init", 2, 0.5])
@@ -660,7 +667,6 @@ async def run() -> None:
             loop.add_signal_handler(signal.SIGTERM, lambda: tg.create_task(terminate()))
     except* (ExitableErr, FatalErr) as exc_group:
         LOGGER.debug(f"{len(exc_group.exceptions)} errs caught in exc group")
-        await write_state(CONF)
 
         ee = exc_group.exceptions[0]
         if isinstance(ee, ExitableErr):

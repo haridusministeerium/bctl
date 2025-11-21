@@ -42,6 +42,7 @@ def _load_state(file_loc: str) -> State:
     t = s.get("timestamp", 0)
     v = s.get("ver", -1)
     if unix_time_now() - t <= TIME_DIFF_DELTA_THRESHOLD_S and v == STATE_VER:
+        LOGGER.debug(f"hydrated state from disk: {s}")
         return s
     return EMPTY_STATE.copy()
 

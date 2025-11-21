@@ -24,14 +24,14 @@ class Client(object):
         except FileNotFoundError:
             self.logger.error("daemon is not running")
             sys.exit(1)
-        logging.debug(f"sending command {cmd}")
+        self.logger.debug(f"sending command {cmd}")
         writer.write(json.dumps(cmd).encode())
         await writer.drain()
         writer.write_eof()
         return reader, writer
 
     async def _close_socket(self, writer):
-        logging.debug("closing the connection")
+        self.logger.debug("closing the connection")
         writer.close()
         await writer.wait_closed()
 
@@ -50,7 +50,7 @@ class Client(object):
         sys.exit(code)
 
     async def _send(self, cmd: list):
-        reader, writer = await self._open_write_socket(cmd)
+        _, writer = await self._open_write_socket(cmd)
         await self._close_socket(writer)
 
     def send_cmd(self, cmd):
