@@ -364,10 +364,7 @@ async def execute_tasks(tasks: List[list]) -> None:
             case ["sync"]:
                 sync = True
             case ["kill"]:
-                try:
-                    await write_state(CONF)
-                finally:
-                    sys.exit(0)
+                sys.exit(0)
             case _:
                 LOGGER.error(f"unexpected task {t}")
 
