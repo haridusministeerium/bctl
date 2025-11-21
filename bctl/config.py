@@ -41,12 +41,12 @@ class Conf(TypedDict):
     ddcutil_svcp_flags: list[str]
     ddcutil_gvcp_flags: list[str]
     monitor_udev: bool
+    udev_event_debounce_sec: float
     periodic_init_sec: int
     sync_brightness: bool
     sync_strategy: str
     get_strategy: str
     notify: NotifyConf
-    udev_event_debounce_sec: float
     msg_consumption_window_sec: float
     brightness_step: int
     ignored_displays: list[str]
@@ -82,10 +82,16 @@ default_conf: Conf = {
     ],
     "ddcutil_gvcp_flags": [],  # flags passed to [ddcutil getvcp] commands
     "monitor_udev": True,  # monitor udev events for drm subsystem to detect ext. display (dis)connections
+    "udev_event_debounce_sec": 3.0,  # both for debouncing & delay; have experienced missed ext. display detection w/ 1.0, but it's flimsy regardless
     "periodic_init_sec": 0,  # periodically re-init/re-detect monitors; 0 to disable
     "sync_brightness": False,  # keep all displays' brightnesses at same value/synchronized
     "sync_strategy": "MEAN",  # if displays' brightnesses differ and are synced, what value to sync them to; only active if sync_brightness=True;
-                              # 'MEAN' = set to arithmetic mean, 'LOW' = set to lowest, 'HIGH' = set to highest
+                              # - MEAN = set to arithmetic mean
+                              # - LOW = set to lowest
+                              # - HIGH = set to highest
+                              # - INTERNAL = set to the internal screen value
+                              # - EXTERNAL = set to _a_ external screen value
+                              # - MODEL:<model> = set to <model> screen value; <model> being [ddcutil --brief detect] cmd "Monitor:" value
     "get_strategy": "MEAN",  # if displays' brightnesses differ and are queried (via get command), what single value to return to represent current brightness level;
                              # 'MEAN' = return arithmetic mean, 'LOW' = return lowest, 'HIGH' = return highest
     "notify": {
@@ -102,7 +108,6 @@ default_conf: Conf = {
             "brightness_off": "notification-display-brightness-off.svg",
         },
     },
-    "udev_event_debounce_sec": 3.0,  # both for debouncing & delay; have experienced missed ext. display detection w/ 1.0, but it's flimsy regardless
     "msg_consumption_window_sec": 0.1,  # can be set to 0 if no delay/window is required
     "brightness_step": 5,  # %
     "ignored_displays": [],  # either [ddcutil --brief detect] cmd "Monitor:" value, or <device> in /sys/class/backlight/<device>
