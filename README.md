@@ -265,4 +265,5 @@ re-initialize its state by sending init command via the client: `$ bctl init`
 
 ## See also
 
+- https://github.com/digitaltrails/vdu_controls
 - https://github.com/orhun/i3-workspace-brightness
