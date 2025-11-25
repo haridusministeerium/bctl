@@ -62,24 +62,30 @@ def down(ctx, delta):
 @main.command
 @click.pass_obj
 @click.option("--notify/--no-notify", default=True)
+@click.option("--track/--no-track", default=True)
 @click.argument("delta", type=int)
-def delta(ctx, notify: bool, delta):
+def delta(ctx, notify: bool, track: bool, delta):
     """Change screens' brightness by given %
 
     :param ctx: context
+    :param notify: whether brightness change notification should be emitted
+    :param track: whether this change should be tracked in 'last_set_brightness'
     :param delta: % delta to change brightness down by
     """
-    ctx.send_cmd(["delta", notify, delta])
+    ctx.send_cmd(["delta", notify, track, delta])
 
 
 @main.command
 @click.pass_obj
 @click.option("--notify/--no-notify", default=True)
+@click.option("--track/--no-track", default=True)
 @click.argument("args", nargs=-1, type=str)
-def set(ctx, notify: bool, args: tuple[str, ...]):
+def set(ctx, notify: bool, track: bool, args: tuple[str, ...]):
     """Change screens' brightness to/by given %
 
     :param ctx: context
+    :param notify: whether brightness change notification should be emitted
+    :param track: whether this change should be tracked in 'last_set_brightness'
     :param value: % value to change brightness to/by
     """
     if not args:
@@ -87,9 +93,9 @@ def set(ctx, notify: bool, args: tuple[str, ...]):
     elif len(args) == 1:
         value = args[0]
         if value.isdigit():
-            ctx.send_cmd(["set", notify, int(value)])
+            ctx.send_cmd(["set", notify, track, int(value)])
         elif value.startswith(("-", "+")) and value[1:].isdigit():
-            ctx.send_cmd(["delta", notify, int(value)])
+            ctx.send_cmd(["delta", notify, track, int(value)])
         else:
             raise ValueError("brightness value to set needs to be [-+]?[0-9]+")
     else:

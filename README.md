@@ -36,6 +36,9 @@ and there's an option to force all the screens' brightnesses to be kept in sync.
 
 ## Managing external displays
 
+This section is more for documenting the possible methods. As long as `ddcutil`
+is installed on the system, feel free to skip.
+
 ### [`ddcci` kernel driver](https://gitlab.com/ddcci-driver-linux/ddcci-driver-linux)
 
 This kernel module _should_ detect the devices and expose 'em under
@@ -65,7 +68,7 @@ lrwxrwxrwx 1 root root 0 Sep  7 09:44 amdgpu_bl0 -> ../../devices/pci0000:00/000
 $ echo 'ddcci 0x37' | sudo tee /sys/bus/i2c/devices/i2c-11/new_device
 ```
 
-- After (`ddcci11` external screen avail):
+- After (`ddcci11` external screen is now avail):
 
 ```sh
 $ ls -l /sys/class/backlight
@@ -140,7 +143,7 @@ Some examples:
                item in [config.py](./bctl/config.py) to set how differing
                brightnesses get consolidated into a single int
 - `bctl setvcp D6 01` - set vcp feature D6 to value 01 for all detected DDC displays;
-  this is simply shortcut for `ddcutil setvcp D6 01`
+  this is simply shortcut for `ddcutil setvcp D6 01`, but executed for all displays.
 
 The daemon also registers signal handlers for `SIGUSR1` & `SIGUSR2`, so
 sending said signals to the daemon process allows bumping brightness up
@@ -159,7 +162,7 @@ $ socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/bctl/bctld-ipc.sock <<< '["get",0,0]' | 
 75
 ```
 
-Likewise, for setting brightness you might define a shell function similar to:
+Likewise, for setting brightness you might define a bash function similar to:
 
 ```sh
 # Sets the screens' brightness level
@@ -173,9 +176,9 @@ set_brightness() {
 
     msg="${1%\%*}"  # strip trailing % if it was (mistakenly) given
     if [[ "$msg" =~ ^[0-9]{1,3}$ ]]; then
-        msg="[\"set\",1,$msg]"
+        msg="[\"set\",$msg]"
     elif [[ "$msg" =~ ^[-+][0-9]{1,3}$ ]]; then
-        msg="[\"delta\",1,$((msg))]"
+        msg="[\"delta\",$((msg))]"
     else
         echo -e "illegal brightness arg provided: [$msg]" 1>&2
         return 1
@@ -184,6 +187,7 @@ set_brightness() {
     socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/bctl/bctld-ipc.sock <<< "$msg"
 }
 ```
+...which is effectively same as `bctl set "$1"`
 
 > [!WARNING]  
 > Please note there will be no guarantees about the stability of this api as it's
@@ -192,8 +196,8 @@ part of internal comms spec.
 ## Configuration
 
 User configuration file is read from `$XDG_CONFIG_HOME/bctl/config.json`.
-For full config list see the [config.py](./bctl/config.py) file that defines the defaults,
-but the most important ones you might want to be aware of or change are:
+For full config list see the [config.py](./bctl/config.py) file that defines the
+defaults, but the most important ones you might want to be aware of or change are:
 
 | Config | Type | Default | Description |
 | --- | --- | --- | --- |

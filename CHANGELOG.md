@@ -1,7 +1,7 @@
 ## 0.0.3 (unreleased)
 ---------------------
 
-- Nothing changed yet.
+- set & delta commands: add --track/--no-track options
 
 
 ## 0.0.2 (2025-11-21)

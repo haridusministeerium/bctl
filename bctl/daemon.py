@@ -164,7 +164,7 @@ async def sync_displays() -> None:
             return
 
     LOGGER.debug(f"syncing brightnesses at {target}%")
-    await TASK_QUEUE.put(["set", True, target])
+    await TASK_QUEUE.put(["set", target])
 
 
 async def init_displays_sim(sim) -> None:
@@ -347,14 +347,17 @@ async def display_op[T](
 
 
 async def execute_tasks(tasks: List[list]) -> None:
-    delta = 0
+    delta: int = 0
     target: int | None = None
     init_retry: None | RetryAsync = None
-    sync = False
-    notify = True
+    sync: bool = False
+    notify: bool = True
+    track_last_set: bool = True
     for t in tasks:
         match t:
-            case ["delta", notify, d]:  # change brightness by delta %
+            case ["delta", notify, track_last_set, d]:  # change brightness by delta %
+                delta += d
+            case ["delta", d]:  # change brightness by delta %
                 delta += d
             case ["up", v]:  # None | int>0
                 v = v if v is not None else CONF.get("brightness_step")
@@ -362,9 +365,10 @@ async def execute_tasks(tasks: List[list]) -> None:
             case ["down", v]:  # None | int>0
                 v = v if v is not None else CONF.get("brightness_step")
                 delta -= v
-            case ["set", notify, value]:  # set brightness to a % value
+            case ["set", notify, track_last_set, target]:  # set brightness to a % value
                 delta = 0  # cancel all previous deltas
-                target = value
+            case ["set", target]:  # set brightness to a % value
+                delta = 0  # cancel all previous deltas
             # case ['setmon', display_id, value]:
                 # d = next((d for d in DISPLAYS if d.id == display_id), None)
                 # if d:
@@ -433,7 +437,7 @@ async def execute_tasks(tasks: List[list]) -> None:
     #}
 
     brightnesses: List[int] = sorted([f.result() for f in futures])
-    if abs(brightnesses[0] - brightnesses[-1]) <= 2:
+    if track_last_set and (brightnesses[0] - brightnesses[-1]) <= 2:
         CONF.get("state")["last_set_brightness"] = brightnesses[0]
     if notify:
         await NOTIF.notify_change(brightnesses[0])
@@ -585,7 +589,7 @@ async def delta_brightness(delta: int):
     LOGGER.debug(
         f"placing brightness change in queue for delta {'+' if delta > 0 else ''}{delta}"
     )
-    await TASK_QUEUE.put(["delta", True, delta])
+    await TASK_QUEUE.put(["delta", delta])
 
 
 async def terminate():
