@@ -5,6 +5,7 @@
 - get command: do not use last_set_brightness state
   and return the _actual_ current brightness of
   displays
+- start using pydantic for config models
 
 
 ## 0.0.2 (2025-11-21)

@@ -109,24 +109,24 @@ class SimulatedDisplay(Display):
 
     def __init__(self, id: str, conf: Conf) -> None:
         super().__init__(id, DisplayType.SIM, BackendType.SIM, conf)
-        self.sim = self.conf.get("sim")
+        self.sim = self.conf.sim
 
     async def init(self, initial_brightness: int) -> None:
         super()._init()
         await asyncio.sleep(3)
-        if self.sim.get("failmode") == "i":
+        if self.sim.failmode == "i":
             raise ExitableErr(
-                f"error initializing [{self.id}]", exit_code=self.sim.get("exit_code")
+                f"error initializing [{self.id}]", exit_code=self.sim.exit_code
             )
         self.raw_brightness = initial_brightness
         self.max_brightness = 100
 
     async def _set_brightness(self, value: int) -> None:
-        await asyncio.sleep(self.sim.get("wait_sec"))
-        if self.sim.get("failmode") == "s":
+        await asyncio.sleep(self.sim.wait_sec)
+        if self.sim.failmode == "s":
             raise ExitableErr(
                 f"error setting [{self.id}] brightness to {value}",
-                exit_code=self.sim.get("exit_code"),
+                exit_code=self.sim.exit_code,
             )
 
 
@@ -144,7 +144,7 @@ class DDCDisplay(Display):
             "ddcutil",
             "--brief",
             "getvcp",
-            self.conf.get("ddcutil_brightness_feature"),
+            self.conf.ddcutil_brightness_feature,
             "--bus",
             self.bus,
         ]
@@ -153,17 +153,17 @@ class DDCDisplay(Display):
         assert len(out) == 5, f"{cmd} output unexpected: {out}"
         self.raw_brightness = int(out[-2])
         self.max_brightness = int(out[-1])
-        assert self.max_brightness >= self.raw_brightness, "max_brightness cannot be smaller than raw_brightness"
+        assert self.max_brightness >= self.raw_brightness, (
+            "max_brightness cannot be smaller than raw_brightness"
+        )
 
     async def _set_brightness(self, value: int) -> None:
-        await self._set_vcp_feature(
-            [self.conf.get("ddcutil_brightness_feature"), str(value)]
-        )
+        await self._set_vcp_feature([self.conf.ddcutil_brightness_feature, str(value)])
 
     async def _set_vcp_feature(self, args: list[str]) -> None:
         await run_cmd(
             ["ddcutil"]
-            + self.conf.get("ddcutil_svcp_flags")
+            + self.conf.ddcutil_svcp_flags
             + ["setvcp"]
             + args
             + ["--bus", self.bus],
@@ -174,7 +174,7 @@ class DDCDisplay(Display):
     async def _get_vcp_feature(self, args: list[str]) -> str:
         out, err, code = await run_cmd(
             ["ddcutil"]
-            + self.conf.get("ddcutil_gvcp_flags")
+            + self.conf.ddcutil_gvcp_flags
             + ["getvcp"]
             + args
             + ["--bus", self.bus],
@@ -190,7 +190,9 @@ class BCTLDisplay(NonDDCDisplay):
         assert len(out) == 5, f"unexpected brightnessctl list output: [{bctl_out}]"
         self.raw_brightness = int(out[2])
         self.max_brightness = int(out[4])
-        assert self.max_brightness >= self.raw_brightness, "max_brightness cannot be smaller than raw_brightness"
+        assert self.max_brightness >= self.raw_brightness, (
+            "max_brightness cannot be smaller than raw_brightness"
+        )
         super().__init__(out[0], conf, BackendType.BRIGHTNESSCTL)
 
     async def init(self) -> None:
@@ -220,7 +222,9 @@ class BrilloDisplay(NonDDCDisplay):
         self.raw_brightness = futures[0].result()
         self.max_brightness = futures[1].result()
         self.min_brightness = futures[2].result()
-        assert self.max_brightness >= self.raw_brightness, "max_brightness cannot be smaller than raw_brightness"
+        assert self.max_brightness >= self.raw_brightness, (
+            "max_brightness cannot be smaller than raw_brightness"
+        )
 
     async def _get_device_attr(self, attr: str) -> int:
         out, err, code = await run_cmd(

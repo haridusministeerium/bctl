@@ -1,91 +1,24 @@
 import os
-import json
 import asyncio
 import shutil
-import logging
-import aiofiles as aiof
-from datetime import datetime
 from asyncio import Task
-from logging import Logger
-from pydash import py_
 from collections.abc import Sequence
 from .exceptions import FatalErr, CmdErr
-from .config import Conf, State, default_conf
-
-STATE_VER = 1  # bump this whenever persisted state data structure changes
-TIME_DIFF_DELTA_THRESHOLD_S = 60
-
-LOGGER: Logger = logging.getLogger(__name__)
 
 
-def _conf_path() -> str:
-    xdg_dir = os.environ.get("XDG_CONFIG_HOME", f"{os.environ['HOME']}/.config")
-    return xdg_dir + "/bctl/config.json"
+def _runtime_path() -> str:
+    xdg_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    dir_path = xdg_dir + "/bctl"
+    if not os.path.isdir(dir_path):
+        os.makedirs(dir_path)
+    return dir_path
 
 
-EMPTY_STATE: State = {"timestamp": 0, "ver": -1, "last_set_brightness": -1}
+RUNTIME_PATH = _runtime_path()
+SOCKET_PATH: str = f"{RUNTIME_PATH}/bctld-ipc.sock"
 
 
-def load_config(load_state: bool = False) -> Conf:
-    conf = py_.merge(default_conf, _read_dict_from_file(_conf_path()))
-
-    if load_state:
-        conf["state"] = _load_state(conf["state_f_path"])
-
-    # LOGGER.debug(f'effective config: {conf}')
-    return conf
-
-
-def _load_state(file_loc: str) -> State:
-    s: State = _read_dict_from_file(file_loc)
-
-    t = s.get("timestamp", 0)
-    v = s.get("ver", -1)
-    if unix_time_now() - t <= TIME_DIFF_DELTA_THRESHOLD_S and v == STATE_VER:
-        LOGGER.debug(f"hydrated state from disk: {s}")
-        return s
-    return EMPTY_STATE.copy()
-
-
-async def write_state(conf: Conf) -> None:
-    current_state: State = conf.get("state")
-    data: State = {
-        "timestamp": unix_time_now(),
-        "ver": STATE_VER,
-        "last_set_brightness": current_state.get("last_set_brightness"),
-    }
-
-    try:
-        LOGGER.debug("storing state...")
-        statef = conf.get("state_f_path")
-        payload = json.dumps(
-            data, indent=2, sort_keys=True, separators=(",", ": "), ensure_ascii=False
-        )
-
-        async with aiof.open(statef, mode="w") as f:
-            await f.write(payload)
-        LOGGER.debug("...state stored")
-    except IOError:
-        raise
-
-
-def _read_dict_from_file(file_loc: str) -> dict:
-    if not (os.path.isfile(file_loc) and os.access(file_loc, os.R_OK)):
-        return {}
-
-    try:
-        with open(file_loc, "r") as f:
-            return json.load(f)
-    except Exception:
-        LOGGER.error(f"error trying to parse json from {file_loc}")
-        return {}
-
-
-def unix_time_now() -> int:
-    return int(datetime.now().timestamp())
-
-
-def same_values(s: Sequence):
+def same_values(s: Sequence) -> bool:
     return s.count(s[0]) == len(s)
 
 

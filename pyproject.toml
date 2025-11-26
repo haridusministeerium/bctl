@@ -5,10 +5,11 @@ description = "service for simultaneously controlling brightness of laptop & ext
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
-keywords=['brightness', 'brightless-control', 'display-brightness', 'screen-brightness']
+keywords=['brightness', 'brightness-control', 'display-brightness', 'screen-brightness']
 dependencies = [
     'click', 'tendo', 'aiofiles',
-    'pyudev', 'desktop-notify', 'pydash',
+    'pyudev', 'desktop-notify',
+    'pydantic',
     'retry-deco',
     'dbus-next'  # note dbus-next is used by desktop-notify; preferably we'd like to switch over to dbus-fast, see https://gitlab.com/hxss-linux/desktop-notify/-/issues/3
 ]

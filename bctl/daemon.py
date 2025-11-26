@@ -33,15 +33,13 @@ from .display import (
     TDisplay,
 )
 from .common import (
-    load_config,
-    write_state,
     run_cmd,
     same_values,
     assert_cmd_exist,
     wait_and_reraise,
-    unix_time_now,
+    SOCKET_PATH,
 )
-from .config import Conf, SimConf
+from .config import Conf, SimConf, load_config, write_state, unix_time_now
 from .exceptions import ExitableErr, FatalErr, PayloadErr, CmdErr, RetriableException
 from .notify import Notif
 
@@ -55,7 +53,7 @@ LAST_INIT_TIME: int = 0
 
 
 def validate_ext_deps() -> None:
-    requirements = [CONF.get("main_display_ctl"), CONF.get("internal_display_ctl")]
+    requirements = [CONF.main_display_ctl, CONF.internal_display_ctl]
     for dep in ["DDCUTIL", "BRILLO", "BRIGHTNESSCTL"]:
         if dep in requirements:
             assert_cmd_exist(dep.lower())
@@ -66,14 +64,14 @@ async def init_displays() -> None:
     global LAST_INIT_TIME
     DISPLAYS = []  # immediately reset old state
 
-    if CONF.get("sim"):
-        return await init_displays_sim(CONF.get("sim"))
+    if CONF.sim:
+        return await init_displays_sim(CONF.sim)
 
     LOGGER.debug("initing displays...")
-    ignore_internal: bool = CONF.get("ignore_internal_display")
+    ignore_internal: bool = CONF.ignore_internal_display
 
     displays: Sequence[Display]
-    match CONF.get("main_display_ctl"):
+    match CONF.main_display_ctl:
         case "DDCUTIL":
             displays = await get_ddcutil_displays(ignore_internal)
         case "RAW":
@@ -84,15 +82,15 @@ async def init_displays() -> None:
             displays = await get_brillo_displays()
         case _:
             raise FatalErr(
-                f"misconfigured display brightness management method [{CONF.get('main_display_ctl')}]"
+                f"misconfigured display brightness management method [{CONF.main_display_ctl}]"
             )
 
     if ignore_internal:
         displays = list(filter(lambda d: d.type != DisplayType.INTERNAL, displays))
-    if CONF.get("ignore_external_display"):
+    if CONF.ignore_external_display:
         displays = list(filter(lambda d: d.type != DisplayType.EXTERNAL, displays))
 
-    ignored_displays = CONF.get("ignored_displays")
+    ignored_displays = CONF.ignored_displays
     if ignored_displays:
         displays = list(filter(lambda d: d.id not in ignored_displays and d.name not in ignored_displays, displays))
 
@@ -109,12 +107,12 @@ async def init_displays() -> None:
         f"...initialized {len(displays)} display{'' if len(displays) == 1 else 's'}"
     )
 
-    if CONF.get("sync_brightness"):
+    if CONF.sync_brightness:
         await sync_displays()
     # TODO: is resetting last_set_brightness reasonable here? even when a new display
     #       gets connected, doesn't it still remain our last requested brightness target?
     elif not same_values([d.get_brightness() for d in DISPLAYS]):
-        CONF.get("state")["last_set_brightness"] = -1  # reset, as potentially newly added display could have a different value
+        CONF.state.last_set_brightness = -1  # reset, as potentially newly added display could have a different value
 
     LAST_INIT_TIME = unix_time_now()
 
@@ -126,10 +124,10 @@ async def sync_displays() -> None:
     if same_values(values):
         return
 
-    target: int = CONF.get("state").get("last_set_brightness")
+    target: int = CONF.state.last_set_brightness
     if target == -1:  # i.e. we haven't explicitly set it to anything yet
         d: Display | None = None
-        strat = CONF.get("sync_strategy")
+        strat = CONF.sync_strategy
         for s in strat:
             match s:
                 case "MEAN":
@@ -170,7 +168,7 @@ async def sync_displays() -> None:
 async def init_displays_sim(sim) -> None:
     global DISPLAYS
 
-    ndisplays: int = sim.get("ndisplays")
+    ndisplays: int = sim.ndisplays
 
     LOGGER.debug(f"initing {ndisplays} simulated displays...")
     displays: List[SimulatedDisplay] = [
@@ -178,7 +176,7 @@ async def init_displays_sim(sim) -> None:
     ]
 
     futures: List[Task[None]] = [
-        asyncio.create_task(d.init(sim.get("initial_brightness"))) for d in displays
+        asyncio.create_task(d.init(sim.initial_brightness)) for d in displays
     ]
     await wait_and_reraise(futures)
 
@@ -193,7 +191,7 @@ async def resolve_single_internal_display_raw() -> RawDisplay:
     return _filter_internal_display(d, BackendType.RAW)
 
     #  alternative logic by verifying internal display via device path, not device name:
-    # device_dirs = glob.glob(CONF.get('raw_device_dir') + '/*')
+    # device_dirs = glob.glob(CONF.raw_device_dir + '/*')
     # displays = []
     # for i in device_dirs:
         # name = os.path.basename(i)
@@ -239,7 +237,7 @@ async def resolve_single_internal_display_bctl() -> BCTLDisplay:
 
 
 async def get_raw_displays() -> List[RawDisplay]:
-    device_dirs: List[str] = glob.glob(CONF.get("raw_device_dir") + "/*")
+    device_dirs: List[str] = glob.glob(CONF.raw_device_dir + "/*")
     assert len(device_dirs) > 0, "no backlight-capable raw devices found"
 
     return [
@@ -255,7 +253,7 @@ async def get_brillo_displays() -> List[BrilloDisplay]:
     return [
         BrilloDisplay(os.path.basename(i), CONF)
         for i in out
-        if await aios.path.exists(Path(CONF.get("raw_device_dir"), i))
+        if await aios.path.exists(Path(CONF.raw_device_dir, i))
     ]  # exists() check to deal with dead symlinks
 
 
@@ -268,12 +266,12 @@ async def get_bctl_displays() -> List[BCTLDisplay]:
     return [
         BCTLDisplay(i, CONF)
         for i in out
-        if await aios.path.exists(Path(CONF.get("raw_device_dir"), i.split(",")[0]))
+        if await aios.path.exists(Path(CONF.raw_device_dir, i.split(",")[0]))
     ]  # exists() check to deal with dead symlinks
 
 
 async def get_ddcutil_displays(ignore_internal: bool) -> List[Display]:
-    bus_path_prefix = CONF.get("ddcutil_bus_path_prefix")
+    bus_path_prefix = CONF.ddcutil_bus_path_prefix
     displays: List[Display] = []
     in_invalid_block = False
     d: DDCDisplay | None = None
@@ -309,7 +307,7 @@ async def get_ddcutil_displays(ignore_internal: bool) -> List[Display]:
             elif re.fullmatch(
                 r"\s+DRM connector:\s+[a-z0-9]+-eDP-\d+", line
             ):  # i.e. "is this a laptop display?"
-                match CONF.get("internal_display_ctl"):
+                match CONF.internal_display_ctl:
                     case "RAW":
                         displays.append(await resolve_single_internal_display_raw())
                     case "BRIGHTNESSCTL":
@@ -318,7 +316,7 @@ async def get_ddcutil_displays(ignore_internal: bool) -> List[Display]:
                         displays.append(await resolve_single_internal_display_brillo())
                     case _:
                         raise FatalErr(
-                            f"misconfigured internal display brightness management method [{CONF.get('internal_display_ctl')}]"
+                            f"misconfigured internal display brightness management method [{CONF.internal_display_ctl}]"
                         )
                 in_invalid_block = False
         elif line.startswith("Display "):
@@ -360,10 +358,10 @@ async def execute_tasks(tasks: List[list]) -> None:
             case ["delta", d]:  # change brightness by delta %
                 delta += d
             case ["up", v]:  # None | int>0
-                v = v if v is not None else CONF.get("brightness_step")
+                v = v if v is not None else CONF.brightness_step
                 delta += v
             case ["down", v]:  # None | int>0
-                v = v if v is not None else CONF.get("brightness_step")
+                v = v if v is not None else CONF.brightness_step
                 delta -= v
             case ["set", notify, track_last_set, target]:  # set brightness to a % value
                 delta = 0  # cancel all previous deltas
@@ -438,15 +436,15 @@ async def execute_tasks(tasks: List[list]) -> None:
 
     brightnesses: List[int] = sorted([f.result() for f in futures])
     if track_last_set and (brightnesses[0] - brightnesses[-1]) <= 2:
-        CONF.get("state")["last_set_brightness"] = brightnesses[0]
+        CONF.state.last_set_brightness = brightnesses[0]
     if notify:
         await NOTIF.notify_change(brightnesses[0])
-    if CONF.get("sync_brightness"):
+    if CONF.sync_brightness:
         await sync_displays()
 
 
 async def process_q() -> NoReturn:
-    consumption_window: float = CONF.get("msg_consumption_window_sec")
+    consumption_window: float = CONF.msg_consumption_window_sec
     while True:
         tasks: List[list] = []
         t: list = await TASK_QUEUE.get()
@@ -579,9 +577,7 @@ async def process_client_commands(err_event: Event) -> None:
                 return
         await _send_response(payload)
 
-    server = await asyncio.start_unix_server(
-        wrapped_client_connected_cb, CONF.get("socket_path")
-    )
+    server = await asyncio.start_unix_server(wrapped_client_connected_cb, SOCKET_PATH)
     await server.serve_forever()
 
 
@@ -617,11 +613,11 @@ def get_brightness(individual: bool, raw: bool) -> List[int | List[str | int]]:
         val = values[0]
     else:
     # } ...or use it: {
-    # val: int = CONF.get("state").get("last_set_brightness")
+    # val: int = CONF.state.last_set_brightness
     # if val == -1:  # i.e. we haven't explicitly set it to anything yet
         # values: List[int] = [d.get_brightness() for d in DISPLAYS]
     #}
-        match CONF.get("get_strategy"):
+        match CONF.get_strategy:
             case "MEAN":
                 val = int(fmean(values))
             case "LOW":
@@ -630,14 +626,14 @@ def get_brightness(individual: bool, raw: bool) -> List[int | List[str | int]]:
                 val = max(values)
             case _:
                 raise FatalErr(
-                    f"misconfigured brightness get strategy [{CONF.get('get_strategy')}]"
+                    f"misconfigured brightness get strategy [{CONF.get_strategy}]"
                 )
 
     return [val]
 
 
 async def periodic_init(period: int) -> NoReturn:
-    delta_threshold_sec = period - 1 - CONF.get("msg_consumption_window_sec")
+    delta_threshold_sec = period - 1 - CONF.msg_consumption_window_sec
     if delta_threshold_sec <= 0:
         raise FatalErr("[periodic_init_sec] value too low")
 
@@ -664,21 +660,21 @@ async def run() -> None:
             tg.create_task(process_q())
             tg.create_task(catch_err(err_event))
             tg.create_task(process_client_commands(err_event))
-            if CONF.get("monitor_udev"):
-                debounced = Debouncer(delay=CONF.get("udev_event_debounce_sec"))
+            if CONF.monitor_udev:
+                debounced = Debouncer(delay=CONF.udev_event_debounce_sec)
                 f = partial(debounced, TASK_QUEUE.put, ["init", 2, 0.5])
                 tg.create_task(monitor_udev_events("drm", "change", f))
-            if CONF.get("periodic_init_sec"):
-                tg.create_task(periodic_init(CONF.get("periodic_init_sec")))
+            if CONF.periodic_init_sec:
+                tg.create_task(periodic_init(CONF.periodic_init_sec))
 
             loop: AbstractEventLoop = asyncio.get_running_loop()
             loop.add_signal_handler(
                 signal.SIGUSR1,
-                lambda: tg.create_task(delta_brightness(CONF.get("brightness_step"))),
+                lambda: tg.create_task(delta_brightness(CONF.brightness_step)),
             )
             loop.add_signal_handler(
                 signal.SIGUSR2,
-                lambda: tg.create_task(delta_brightness(-CONF.get("brightness_step"))),
+                lambda: tg.create_task(delta_brightness(-CONF.brightness_step)),
             )
             loop.add_signal_handler(signal.SIGINT, lambda: tg.create_task(terminate()))
             loop.add_signal_handler(signal.SIGTERM, lambda: tg.create_task(terminate()))
@@ -689,7 +685,7 @@ async def run() -> None:
         if isinstance(ee, ExitableErr):
             exit_code: int = ee.exit_code
         else:
-            exit_code: int = CONF.get("fatal_exit_code")
+            exit_code: int = CONF.fatal_exit_code
         LOGGER.debug(f"{type(ee).__name__} caught, exiting with code {exit_code}...")
         await NOTIF.notify_err(ee)
         sys.exit(exit_code)
@@ -732,10 +728,10 @@ def main(debug=False, sim_conf: SimConf | None = None) -> None:
     LOCK = Lock()
 
     CONF = load_config(load_state=True)
-    CONF["sim"] = sim_conf
-    NOTIF = Notif(CONF.get("notify"))
+    CONF.sim = sim_conf
+    NOTIF = Notif(CONF.notify)
 
-    log_lvl = logging.DEBUG if debug else getattr(logging, CONF.get("log_lvl", "INFO"))
+    log_lvl = logging.DEBUG if debug else getattr(logging, CONF.log_lvl)
     logging.basicConfig(stream=sys.stdout, level=log_lvl)
 
     asyncio.run(run())

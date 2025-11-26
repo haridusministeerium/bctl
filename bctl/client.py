@@ -3,8 +3,7 @@ import logging
 import sys
 import json
 from logging import Logger
-from .common import load_config
-from .config import Conf
+from .common import SOCKET_PATH
 
 
 class Client(object):
@@ -14,13 +13,10 @@ class Client(object):
         self.logger: Logger = logging.getLogger(__name__)
         log_lvl = logging.DEBUG if debug else logging.INFO
         logging.basicConfig(stream=sys.stdout, level=log_lvl)
-        self.conf: Conf = load_config()
 
     async def _open_write_socket(self, cmd: list):
         try:
-            reader, writer = await asyncio.open_unix_connection(
-                self.conf.get("socket_path")
-            )
+            reader, writer = await asyncio.open_unix_connection(SOCKET_PATH)
         except FileNotFoundError:
             self.logger.error("daemon is not running")
             sys.exit(1)

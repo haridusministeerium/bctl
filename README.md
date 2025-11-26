@@ -152,7 +152,7 @@ and down respectively; e.g.: `kill -s SIGUSR1 "$(pgrep -x bctld)"` or
 
 ### Socket
 
-The client and daemon communicate over a unix socket set via `socket_path` config.
+The client and daemon communicate over a unix socket at `$XDG_RUNTIME_DIR/bctl/bctld-ipc.sock`.
 If using the provided client is too slow (e.g. for querying brightness), it's
 possible to talk to the daemon directly over this socket. For instance current 
 brightness can be fetched via following command, which is equivalent to `bctl get`:

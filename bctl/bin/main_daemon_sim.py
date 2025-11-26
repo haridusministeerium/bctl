@@ -2,7 +2,7 @@
 
 import click
 import bctl.daemon as daemon
-from ..config import SimConf
+from bctl.config import SimConf
 
 
 @click.command
@@ -18,19 +18,19 @@ from ..config import SimConf
 @click.option("-b", "--brightness", help="Initial brightness", default=50)
 @click.option("-f", "--fail", type=str, help="Failure mode to simulate")
 @click.option("-e", "--exit", default=1, help="code to exit chosen failmode with")
-def main(debug, number, wait, brightness, fail, exit):
+def main(debug, number, wait, brightness, fail, exit) -> None:
     failmodes = ["i", "s"]
     assert number > 0, "number of simulated displays must be positive"
     assert fail in failmodes + [None], f"allowed failmodes are {failmodes}"
     assert number >= 0, "exit code needs to be >= 0"
 
-    sim: SimConf = {
+    sim: SimConf = SimConf.model_validate({
         "ndisplays": number,
         "wait_sec": wait,
         "initial_brightness": brightness,
         "failmode": fail,
         "exit_code": exit,
-    }
+    })
 
     daemon.main(debug, sim)
 
