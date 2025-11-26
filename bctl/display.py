@@ -153,6 +153,7 @@ class DDCDisplay(Display):
         assert len(out) == 5, f"{cmd} output unexpected: {out}"
         self.raw_brightness = int(out[-2])
         self.max_brightness = int(out[-1])
+        assert self.max_brightness >= self.raw_brightness, "max_brightness cannot be smaller than raw_brightness"
 
     async def _set_brightness(self, value: int) -> None:
         await self._set_vcp_feature(
@@ -186,9 +187,10 @@ class DDCDisplay(Display):
 class BCTLDisplay(NonDDCDisplay):
     def __init__(self, bctl_out: str, conf: Conf) -> None:
         out = bctl_out.split(",")
-        assert len(out) == 5, f"unexpected bctl list output: [{bctl_out}]"
+        assert len(out) == 5, f"unexpected brightnessctl list output: [{bctl_out}]"
         self.raw_brightness = int(out[2])
         self.max_brightness = int(out[4])
+        assert self.max_brightness >= self.raw_brightness, "max_brightness cannot be smaller than raw_brightness"
         super().__init__(out[0], conf, BackendType.BRIGHTNESSCTL)
 
     async def init(self) -> None:
@@ -218,6 +220,7 @@ class BrilloDisplay(NonDDCDisplay):
         self.raw_brightness = futures[0].result()
         self.max_brightness = futures[1].result()
         self.min_brightness = futures[2].result()
+        assert self.max_brightness >= self.raw_brightness, "max_brightness cannot be smaller than raw_brightness"
 
     async def _get_device_attr(self, attr: str) -> int:
         out, err, code = await run_cmd(
@@ -264,6 +267,7 @@ class RawDisplay(NonDDCDisplay):
         ):
             # self.max_brightness = int(max_brightness_f.read_text().strip())  # non-async
             self.max_brightness = await self._read_int(max_brightness_f)
+            # assert self.max_brightness >= self.raw_brightness, "max_brightness cannot be smaller than raw_brightness"
 
     async def _read_int(self, file: Path) -> int:
         async with aiof.open(file, mode="r") as f:

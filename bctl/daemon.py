@@ -11,7 +11,7 @@ import glob
 from retry_deco import RetryAsync, OnErrOpts
 from logging import Logger
 from types import TracebackType
-from asyncio import AbstractEventLoop, Task, Queue, Lock
+from asyncio import AbstractEventLoop, Task, Queue, Lock, Event
 from typing import NoReturn, Callable, Coroutine, Any, List, Sequence
 from tendo import singleton
 from pathlib import Path
@@ -479,7 +479,7 @@ def handle_failure_after_retries(e: Exception):
     return [1, str(e)]
 
 
-async def process_client_commands(err_event) -> None:
+async def process_client_commands(err_event: Event) -> None:
     init_displays_retry_handler = get_retry(2, 0.3, True)
 
     # this wrapper is so exceptions from serve_forever() callbacks (which are not
@@ -553,24 +553,24 @@ async def process_client_commands(err_event) -> None:
                             ],
                         ],
                     )
-            case ["set_for", retry, sleep, params]:
+            case ["set_for", retry, sleep, disp_to_brightness]:
                 r = get_retry(
                     retry, sleep, handle_failure_after_retries, init_displays_retry
                 )
                 async with LOCK:
                     payload = await r(
                         disp_op,
-                        lambda d: d.set_brightness(params[d.id]),
-                        lambda d: d.id in params,
+                        lambda d: d.set_brightness(disp_to_brightness[d.id]),
+                        lambda d: d.id in disp_to_brightness,
                     )
-            case ["set_for_async", params]:
+            case ["set_for_async", disp_to_brightness]:
                 # TODO: consider passing OnErrOpts.RUN_ON_LAST_TRY to retry opts; with that we might even change to retries=0
                 r = get_retry(1, 0.5, True, init_displays_retry)
                 async with LOCK:
                     await r(
                         display_op,
-                        lambda d: d.set_brightness(params[d.id]),
-                        lambda d: d.id in params,
+                        lambda d: d.set_brightness(disp_to_brightness[d.id]),
+                        lambda d: d.id in disp_to_brightness,
                     )
                     return
             case _:
@@ -604,7 +604,7 @@ async def terminate():
 
 # note raw values only make sense when asked for individual displays, as
 # we can't really collate them into a single value as the scales potentially differ
-def get_brightness(individual: bool, raw: bool) -> List[str | int | List[str | int]]:
+def get_brightness(individual: bool, raw: bool) -> List[int | List[str | int]]:
     if not DISPLAYS:
         return []
     elif individual:
@@ -648,7 +648,7 @@ async def periodic_init(period: int) -> NoReturn:
             await TASK_QUEUE.put(["init", 1, 0.5])
 
 
-async def catch_err(err_event) -> None:
+async def catch_err(err_event: Event) -> None:
     await err_event.wait()
     raise err_event.err
 
@@ -658,7 +658,7 @@ async def run() -> None:
         validate_ext_deps()
         init_displays_retry_handler = get_retry(5, 0.8)
         await init_displays_retry_handler(init_displays)
-        err_event = asyncio.Event()
+        err_event: Event = asyncio.Event()
 
         async with asyncio.TaskGroup() as tg:
             tg.create_task(process_q())
