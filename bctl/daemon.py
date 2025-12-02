@@ -37,6 +37,7 @@ from .common import (
     same_values,
     assert_cmd_exist,
     wait_and_reraise,
+    Opts,
     SOCKET_PATH,
 )
 from .config import Conf, SimConf, load_config, write_state, unix_time_now
@@ -344,16 +345,20 @@ async def display_op[T](
     return futures, displays
 
 
+def get_disp_filter(opts: Opts | int) -> Callable[[Display], bool]:
+    return lambda d: not ((opts & Opts.IGNORE_INTERNAL and d.type == DisplayType.INTERNAL)
+                       or opts & Opts.IGNORE_EXTERNAL and d.type == DisplayType.EXTERNAL)
+
+
 async def execute_tasks(tasks: List[list]) -> None:
     delta: int = 0
     target: int | None = None
     init_retry: None | RetryAsync = None
     sync: bool = False
-    notify: bool = True
-    track_last_set: bool = True
+    opts = 0
     for t in tasks:
         match t:
-            case ["delta", notify, track_last_set, d]:  # change brightness by delta %
+            case ["delta", opts, d]:  # change brightness by delta %
                 delta += d
             case ["delta", d]:  # change brightness by delta %
                 delta += d
@@ -363,7 +368,7 @@ async def execute_tasks(tasks: List[list]) -> None:
             case ["down", v]:  # None | int>0
                 v = v if v is not None else CONF.brightness_step
                 delta -= v
-            case ["set", notify, track_last_set, target]:  # set brightness to a % value
+            case ["set", opts, target]:  # set brightness to a % value
                 delta = 0  # cancel all previous deltas
             case ["set", target]:  # set brightness to a % value
                 delta = 0  # cancel all previous deltas
@@ -413,7 +418,7 @@ async def execute_tasks(tasks: List[list]) -> None:
     number_tasks = f"{len(tasks)} task{'' if len(tasks) == 1 else 's'}"
     LOGGER.debug(f"about to execute() {number_tasks}...")
     try:
-        futures, _ = await r(display_op, f)
+        futures, _ = await r(display_op, f, get_disp_filter(opts))
         LOGGER.debug(f"...executed {number_tasks}")
     except Exception as e:
         LOGGER.error(f"...error executing tasks: {e}")
@@ -435,9 +440,9 @@ async def execute_tasks(tasks: List[list]) -> None:
     #}
 
     brightnesses: List[int] = sorted([f.result() for f in futures])
-    if track_last_set and (brightnesses[0] - brightnesses[-1]) <= 2:
+    if not opts & Opts.NO_TRACK and (brightnesses[0] - brightnesses[-1]) <= 2:
         CONF.state.last_set_brightness = brightnesses[0]
-    if notify:
+    if not opts & Opts.NO_NOTIFY:
         await NOTIF.notify_change(brightnesses[0])
     if CONF.sync_brightness:
         await sync_displays()
@@ -518,10 +523,10 @@ async def process_client_commands(err_event: Event) -> None:
         init_displays_retry = partial(init_displays_retry_handler, init_displays)
         payload = [1]
         match data:
-            case ["get", individual, raw]:
+            case ["get", opts]:
                 async with LOCK:
                     with suppress(RetriableException):
-                        payload = [0, *get_brightness(individual, raw)]
+                        payload = [0, *get_brightness(opts)]
             case ["setvcp", retry, sleep, *params]:
                 r = get_retry(
                     retry, sleep, handle_failure_after_retries, init_displays_retry
@@ -600,22 +605,24 @@ async def terminate():
 
 # note raw values only make sense when asked for individual displays, as
 # we can't really collate them into a single value as the scales potentially differ
-def get_brightness(individual: bool, raw: bool) -> List[int | List[str | int]]:
-    if not DISPLAYS:
+def get_brightness(opts) -> List[int | List[str | int]]:
+    displays = list(filter(get_disp_filter(opts), DISPLAYS))
+
+    if not displays:
         return []
-    elif individual:
-        # return [f'{d.id},{d.get_brightness(raw)}' for d in DISPLAYS]
-        return [[d.id, d.get_brightness(raw)] for d in DISPLAYS]
+    elif opts & Opts.GET_INDIVIDUAL:
+        # return [f'{d.id},{d.get_brightness(opts & Opts.GET_RAW)}' for d in displays]
+        return [[d.id, d.get_brightness(opts & Opts.GET_RAW)] for d in displays]
 
     # either ignore last_set_brightness... {
-    values: List[int] = [d.get_brightness() for d in DISPLAYS]
+    values: List[int] = [d.get_brightness() for d in displays]
     if same_values(values):
         val = values[0]
     else:
     # } ...or use it: {
     # val: int = CONF.state.last_set_brightness
     # if val == -1:  # i.e. we haven't explicitly set it to anything yet
-        # values: List[int] = [d.get_brightness() for d in DISPLAYS]
+        # values: List[int] = [d.get_brightness() for d in displays]
     #}
         match CONF.get_strategy:
             case "MEAN":

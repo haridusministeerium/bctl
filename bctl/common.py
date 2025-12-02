@@ -3,8 +3,17 @@ import asyncio
 import shutil
 from asyncio import Task
 from collections.abc import Sequence
+from enum import IntFlag
 from .exceptions import FatalErr, CmdErr
 
+class Opts(IntFlag):
+    NO_NOTIFY = 1
+    NO_TRACK = 2
+    GET_INDIVIDUAL = 4
+    GET_RAW = 8
+    IGNORE_EXTERNAL = 16
+    IGNORE_INTERNAL = 32
+    # NEXT_OPT = 64
 
 def _runtime_path() -> str:
     xdg_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")

@@ -4,6 +4,7 @@
 
 import click
 import bctl.client as client
+from bctl.common import Opts
 
 
 def collect_per_disp_args(args: tuple[str, ...]) -> dict:
@@ -19,6 +20,25 @@ def collect_per_disp_args(args: tuple[str, ...]) -> dict:
             # params.append([d, v])
             p[d] = v
     return p
+
+
+def pack_opts(notify: bool = True, track: bool = True,
+              internal: bool = True, external: bool = True,
+              get_individual: bool = False, get_raw: bool = False) -> int:
+    opts = 0
+    if not notify:
+        opts |= Opts.NO_NOTIFY
+    if not track:
+        opts |= Opts.NO_TRACK
+    if not internal:
+        opts |= Opts.IGNORE_INTERNAL
+    if not external:
+        opts |= Opts.IGNORE_EXTERNAL
+    if get_individual:
+        opts |= Opts.GET_INDIVIDUAL
+    if get_raw:
+        opts |= Opts.GET_RAW
+    return opts
 
 
 @click.group
@@ -72,15 +92,19 @@ def delta(ctx, notify: bool, track: bool, delta):
     :param track: whether this change should be tracked in 'last_set_brightness'
     :param delta: % delta to change brightness down by
     """
-    ctx.send_cmd(["delta", notify, track, delta])
+    opts = pack_opts(notify, track)
+    ctx.send_cmd(["delta", opts, delta])
 
 
 @main.command
 @click.pass_obj
 @click.option("--notify/--no-notify", default=True)
 @click.option("--track/--no-track", default=True)
+@click.option("--external/--no-external", default=True)
+@click.option("--internal/--no-internal", default=True)
 @click.argument("args", nargs=-1, type=str)
-def set(ctx, notify: bool, track: bool, args: tuple[str, ...]):
+def set(ctx, notify: bool, track: bool, external: bool,
+        internal: bool, args: tuple[str, ...]):
     """Change screens' brightness to/by given %
 
     :param ctx: context
@@ -92,16 +116,22 @@ def set(ctx, notify: bool, track: bool, args: tuple[str, ...]):
         raise ValueError("params missing")
     elif len(args) == 1:
         value = args[0]
+        opts = pack_opts(notify, track,
+                                     internal=internal, external=external)
+
         if value.isdigit():
-            ctx.send_cmd(["set", notify, track, int(value)])
+            ctx.send_cmd(["set", opts, int(value)])
         elif value.startswith(("-", "+")) and value[1:].isdigit():
-            ctx.send_cmd(["delta", notify, track, int(value)])
+            ctx.send_cmd(["delta", opts, int(value)])
         else:
             raise ValueError("brightness value to set needs to be [-+]?[0-9]+")
     else:
         assert len(args) % 2 == 0, (
             "when setting multiple displays, then even # or args expected"
         )
+        # assert notify and track and not ignore_external and not ignore_internal, (
+            # "when setting brightnesses per monitor, then additional options are non-op"
+        # )
         ctx.send_cmd(["set_for_async", collect_per_disp_args(args)])
 
 
@@ -165,7 +195,9 @@ def getvcp(ctx, retry: int, sleep: float | int, args: tuple[str, ...]):
     "-i", "--individual", is_flag=True, help="retrieve brightness levels per screen"
 )
 @click.option("-r", "--raw", is_flag=True, help="retrieve raw brightness value")
-def get(ctx, individual: bool, raw: bool):
+@click.option("--external/--no-external", default=True)
+@click.option("--internal/--no-internal", default=True)
+def get(ctx, individual: bool, raw: bool, external: bool, internal: bool):
     """Get screens' brightness (%)
 
     :param ctx: context
@@ -174,7 +206,9 @@ def get(ctx, individual: bool, raw: bool):
         raise ValueError(
             "raw values only make sense per-display, i.e. --raw option requires --individual"
         )
-    ctx.send_receive_cmd(["get", individual, raw])
+    opts = pack_opts(get_individual=individual, get_raw=raw,
+                     internal=internal, external=external)
+    ctx.send_receive_cmd(["get", opts])
 
 
 @main.command

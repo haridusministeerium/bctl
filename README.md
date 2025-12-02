@@ -153,12 +153,13 @@ and down respectively; e.g.: `kill -s SIGUSR1 "$(pgrep -x bctld)"` or
 ### Socket
 
 The client and daemon communicate over a unix socket at `$XDG_RUNTIME_DIR/bctl/bctld-ipc.sock`.
+Note if `XDG_RUNTIME_DIR` is not defined, it defaults to `/run/user/$UID`.
 If using the provided client is too slow (e.g. for querying brightness), it's
 possible to talk to the daemon directly over this socket. For instance current 
 brightness can be fetched via following command, which is equivalent to `bctl get`:
 
 ```sh
-$ socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/bctl/bctld-ipc.sock <<< '["get",0,0]' | jq -re '.[1]'
+$ socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/bctl/bctld-ipc.sock <<< '["get",0]' | jq -re '.[1]'
 75
 ```
 
