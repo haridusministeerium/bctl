@@ -9,7 +9,7 @@ keywords=['brightness', 'brightness-control', 'display-brightness', 'screen-brig
 dependencies = [
     'click', 'tendo', 'aiofiles',
     'pyudev', 'desktop-notify',
-    'pydantic',
+    'pydantic', 'pydash',
     'retry-deco',
     'dbus-next'  # note dbus-next is used by desktop-notify; preferably we'd like to switch over to dbus-fast, see https://gitlab.com/hxss-linux/desktop-notify/-/issues/3
 ]

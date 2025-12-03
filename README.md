@@ -196,7 +196,9 @@ part of internal comms spec.
 
 ## Configuration
 
-User configuration file is read from `$XDG_CONFIG_HOME/bctl/config.json`.
+User configuration files are read from `$XDG_CONFIG_HOME/bctl/*.json`. The
+generated config will be the merger of all json files, with files ordered
+by the lexical order of their names.
 For full config list see the [config.py](./bctl/config.py) file that defines the
 defaults, but the most important ones you might want to be aware of or change are:
 

@@ -1,9 +1,11 @@
 import os
+import glob
 import json
 import logging
 from enum import StrEnum, auto
 import aiofiles as aiof
 from pydantic import BaseModel
+from pydash import py_
 from datetime import datetime
 from logging import Logger
 from .common import RUNTIME_PATH
@@ -127,18 +129,24 @@ class Conf(BaseModel):
 
 
 def load_config(load_state: bool = False) -> Conf:
-    conf = Conf.model_validate_json(_read_json_bytes_from_file(_conf_path()))
+    configs = [
+        _read_dict_from_file(c)
+        for c in sorted(glob.glob(_conf_path() + "/*.json"))
+    ]
+    # conf = py_.merge(Conf().dict(), *configs)
+    conf = py_.merge({}, *configs)
+    conf = Conf.model_validate(conf)
 
     if load_state:
         conf.state = _load_state(conf.state_f_path)
 
-    # LOGGER.debug(f'effective config: {conf}')
+    # LOGGER.error(f"effective config: {conf}")
     return conf
 
 
 def _conf_path() -> str:
     xdg_dir = os.environ.get("XDG_CONFIG_HOME", f"{os.environ['HOME']}/.config")
-    return xdg_dir + "/bctl/config.json"
+    return xdg_dir + "/bctl"
 
 
 def _load_state(file_loc: str) -> State:
@@ -183,6 +191,19 @@ def _read_json_bytes_from_file(file_loc: str) -> bytes:
     except Exception:
         LOGGER.error(f"error trying to read json as bytes from {file_loc}")
         return b"{}"
+
+
+def _read_dict_from_file(file_loc: str) -> dict:
+    if not (os.path.isfile(file_loc) and os.access(file_loc, os.R_OK)):
+        return {}
+
+    try:
+        with open(file_loc, "r") as f:
+            return json.load(f)
+    except Exception:
+        LOGGER.error(f"error trying to parse json from {file_loc}")
+        return {}
+
 
 
 def unix_time_now() -> int:

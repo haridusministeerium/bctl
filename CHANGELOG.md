@@ -10,6 +10,8 @@
   allows offsetting certain dispalys' brightnesses from others.
   useful in cases where some displays, e.g. that of laptop's internal
   one, is brighter or dimmer than others
+- allow multiple configuration files
+  config is now merged from multiple files from `$XDG_CONFIG_HOME/bctl/*.json`
 
 
 
