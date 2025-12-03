@@ -64,8 +64,16 @@ class Display(ABC):
                             break
                     else:
                         raise FatalErr(f"misconfigured offset criteria [{crit}]")
+
+        if self.raw_brightness < 0:
+            raise FatalErr(f"[{self.id}] raw_brightness appears to be uninitialized: {self.raw_brightness}")
+        if self.max_brightness <= 0:
+            raise FatalErr(f"[{self.id}] max_brightness appears to be uninitialized: {self.max_brightness}")
+        if self.max_brightness < self.raw_brightness:
+            raise FatalErr("max_brightness cannot be smaller than raw_brightness")
+
         self.logger.debug(
-            f"  -> initializing {self.type} display [{self.id}], offset {self.offset}..."
+            f"  -> initialized {self.type} display [{self.id}], offset {self.offset}"
         )
 
     @abstractmethod
@@ -113,9 +121,6 @@ class Display(ABC):
         return self._get_brightness(raw, offset_normalized)
 
     def _get_brightness(self, raw: bool, offset_normalized: bool) -> int:
-        if self.raw_brightness == -1:
-            raise FatalErr(f"[{self.id}] appears to be uninitialized")
-
         return (
             self.raw_brightness - (round(self.eoffset / 100 * self.max_brightness) if offset_normalized else 0)
             if raw
@@ -141,7 +146,6 @@ class SimulatedDisplay(Display):
         self.sim = self.conf.sim
 
     async def init(self, initial_brightness: int) -> None:
-        super()._init()
         await asyncio.sleep(3)
         if self.sim.failmode == "i":
             raise ExitableErr(
@@ -149,6 +153,7 @@ class SimulatedDisplay(Display):
             )
         self.raw_brightness = initial_brightness
         self.max_brightness = 100
+        super()._init()
 
     async def _set_brightness(self, value: int) -> None:
         await asyncio.sleep(self.sim.wait_sec)
@@ -167,7 +172,6 @@ class DDCDisplay(Display):
         super().__init__(id, DisplayType.EXTERNAL, BackendType.DDCUTIL, conf)
 
     async def init(self) -> None:
-        super()._init()
         assert self.bus.isdigit(), f"[{self.id}] bus is invalid: [{self.bus}]"
         cmd = [
             "ddcutil",
@@ -182,9 +186,7 @@ class DDCDisplay(Display):
         assert len(out) == 5, f"{cmd} output unexpected: {out}"
         self.raw_brightness = int(out[-2])
         self.max_brightness = int(out[-1])
-        assert self.max_brightness >= self.raw_brightness, (
-            "max_brightness cannot be smaller than raw_brightness"
-        )
+        super()._init()
 
     async def _set_brightness(self, value: int) -> None:
         await self._set_vcp_feature([self.conf.ddcutil_brightness_feature, str(value)])
@@ -219,9 +221,6 @@ class BCTLDisplay(NonDDCDisplay):
         assert len(out) == 5, f"unexpected brightnessctl list output: [{bctl_out}]"
         self.raw_brightness = int(out[2])
         self.max_brightness = int(out[4])
-        assert self.max_brightness >= self.raw_brightness, (
-            "max_brightness cannot be smaller than raw_brightness"
-        )
         super().__init__(out[0], conf, BackendType.BRIGHTNESSCTL)
 
     async def init(self) -> None:
@@ -240,8 +239,6 @@ class BrilloDisplay(NonDDCDisplay):
         super().__init__(id, conf, BackendType.BRILLO)
 
     async def init(self) -> None:
-        super()._init()
-
         futures: list[Task[int]] = [
             asyncio.create_task(self._get_device_attr("b")),  # current brightness
             asyncio.create_task(self._get_device_attr("m")),  # max
@@ -249,9 +246,7 @@ class BrilloDisplay(NonDDCDisplay):
         await wait_and_reraise(futures)
         self.raw_brightness = futures[0].result()
         self.max_brightness = futures[1].result()
-        assert self.max_brightness >= self.raw_brightness, (
-            "max_brightness cannot be smaller than raw_brightness"
-        )
+        super()._init()
 
     async def _get_device_attr(self, attr: str) -> int:
         out, err, code = await run_cmd(
@@ -278,8 +273,6 @@ class RawDisplay(NonDDCDisplay):
         self.device_dir = device_dir  # caller needs to verify it exists!
 
     async def init(self) -> None:
-        super()._init()
-
         self.brightness_f = Path(self.device_dir, "brightness")
 
         if not (
@@ -298,7 +291,7 @@ class RawDisplay(NonDDCDisplay):
         ):
             # self.max_brightness = int(max_brightness_f.read_text().strip())  # non-async
             self.max_brightness = await self._read_int(max_brightness_f)
-            # assert self.max_brightness >= self.raw_brightness, "max_brightness cannot be smaller than raw_brightness"
+        super()._init()
 
     async def _read_int(self, file: Path) -> int:
         async with aiof.open(file, mode="r") as f:
