@@ -13,7 +13,6 @@ from .common import RUNTIME_PATH
 LOGGER: Logger = logging.getLogger(__name__)
 
 STATE_VER = 1  # bump this whenever persisted state data structure changes
-TIME_DIFF_DELTA_THRESHOLD_S = 60
 
 
 class SimConf(BaseModel):
@@ -126,6 +125,7 @@ class Conf(BaseModel):
     sim: SimConf | None = None  # simulation config, will be set by sim client
     state_f_path: str = f"{RUNTIME_PATH}/bctld.state"  # state that should survive restarts are stored here
     state: State = State()  # do not set, will be read in from state_f_path
+    max_state_age_sec: int = 60  # only use persisted state if it's younger than this
 
 
 def load_config(load_state: bool = False) -> Conf:
@@ -138,7 +138,7 @@ def load_config(load_state: bool = False) -> Conf:
     conf = Conf.model_validate(conf)
 
     if load_state:
-        conf.state = _load_state(conf.state_f_path)
+        conf.state = _load_state(conf)
 
     # LOGGER.error(f"effective config: {conf}")
     return conf
@@ -149,12 +149,12 @@ def _conf_path() -> str:
     return xdg_dir + "/bctl"
 
 
-def _load_state(file_loc: str) -> State:
-    s = State.model_validate_json(_read_json_bytes_from_file(file_loc))
+def _load_state(conf: Conf) -> State:
+    s = State.model_validate_json(_read_json_bytes_from_file(conf.state_f_path))
 
     t = s.timestamp
     v = s.ver
-    if unix_time_now() - t <= TIME_DIFF_DELTA_THRESHOLD_S and v == STATE_VER:
+    if unix_time_now() - t <= conf.max_state_age_sec and v == STATE_VER:
         LOGGER.debug(f"hydrated state from disk: {s}")
         return s
     return State()
