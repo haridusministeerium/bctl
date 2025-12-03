@@ -206,19 +206,14 @@ def getvcp(ctx, retry: int, sleep: float | int, args: tuple[str, ...]):
 @click.option("-r", "--raw", is_flag=True, help="retrieve raw brightness value")
 @click.option("--ignore-external", is_flag=True, help="ingore external displays")
 @click.option("--ignore-internal", is_flag=True, help="ingore internal displays")
-@click.option(
-    "-o",
-    "--offset-normalized",
-    is_flag=True,
-    help="normalize brightness value w/ effective offset",
-)
+@click.option("--no-offset", is_flag=True, help="do NOT normalize brightness value for effective offset")
 def get(
     ctx,
     individual: bool,
     raw: bool,
     ignore_external: bool,
     ignore_internal: bool,
-    offset_normalized: bool,
+    no_offset: bool,
 ):
     """Get screens' brightness (%)
 
@@ -234,8 +229,8 @@ def get(
         opts |= Opts.GET_INDIVIDUAL
     if raw:
         opts |= Opts.GET_RAW
-    if offset_normalized:
-        opts |= Opts.GET_OFFSET_NORMALIZED
+    if no_offset:
+        opts |= Opts.GET_NO_OFFSET_NORMALIZED
     ctx.send_receive_cmd(["get", opts])
 
 

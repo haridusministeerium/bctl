@@ -18,9 +18,9 @@ from pathlib import Path
 from statistics import fmean
 from contextlib import suppress
 import aiofiles.os as aios
-from .debouncer import Debouncer
-from .udev_monitor import monitor_udev_events
-from .display import (
+from bctl.debouncer import Debouncer
+from bctl.udev_monitor import monitor_udev_events
+from bctl.display import (
     BackendType,
     DisplayType,
     Display,
@@ -32,7 +32,7 @@ from .display import (
     TNonDDCDisplay,
     TDisplay,
 )
-from .common import (
+from bctl.common import (
     run_cmd,
     same_values,
     assert_cmd_exist,
@@ -40,7 +40,7 @@ from .common import (
     Opts,
     SOCKET_PATH,
 )
-from .config import (
+from bctl.config import (
     Conf,
     SimConf,
     load_config,
@@ -142,7 +142,7 @@ async def init_displays() -> None:
         await sync_displays()
     # TODO: is resetting last_set_brightness reasonable here? even when a new display
     #       gets connected, doesn't it still remain our last requested brightness target?
-    elif not same_values([d.get_brightness(offset_normalized=True) for d in DISPLAYS]):
+    elif not same_values([d.get_brightness() for d in DISPLAYS]):
         CONF.state.last_set_brightness = -1  # reset, as potentially newly added display could have a different value
 
     LAST_INIT_TIME = unix_time_now()
@@ -151,15 +151,14 @@ async def init_displays() -> None:
 async def sync_displays() -> None:
     if len(DISPLAYS) <= 1:
         return
-    values: List[int] = [d.get_brightness(offset_normalized=True) for d in DISPLAYS]
+    values: List[int] = [d.get_brightness() for d in DISPLAYS]
     if same_values(values):
         return
 
     target: int = CONF.state.last_set_brightness
     if target == -1:  # i.e. we haven't explicitly set it to anything yet
         d: Display | None = None
-        strat = CONF.sync_strategy
-        for s in strat:
+        for s in CONF.sync_strategy:
             match s:
                 case "mean":
                     target = int(fmean(values))
@@ -185,10 +184,10 @@ async def sync_displays() -> None:
                         raise FatalErr(f"misconfigured brightness sync strategy [{s}]")
 
         if d is not None:
-            target = d.get_brightness(offset_normalized=True)
+            target = d.get_brightness()
         elif target == -1:
             LOGGER.info(
-                f"cannot sync brightnesses as no displays detected for sync strategy [{strat}]"
+                f"cannot sync brightnesses as no displays detected for sync strategy [{CONF.sync_strategy}]"
             )
             return
 
@@ -469,7 +468,6 @@ async def execute_tasks(tasks: List[list]) -> None:
 
     brightnesses: List[int] = sorted([f.result() for f in futures])
     if not opts & Opts.NO_TRACK and (brightnesses[-1] - brightnesses[0]) <= 2:
-        print(f'yooooooooooooo: {brightnesses}')
         CONF.state.last_set_brightness = brightnesses[0]
     if not opts & Opts.NO_NOTIFY:
         await NOTIF.notify_change(brightnesses[0])  # TODO: shouldn't we consolidate the value?
@@ -640,13 +638,13 @@ def get_brightness(opts) -> List[int | List[str | int]]:
     if not displays:
         return []
     elif opts & Opts.GET_INDIVIDUAL:
-        # return [f'{d.id},{d.get_brightness(raw=opts & Opts.GET_RAW, offset_normalized=opts & Opts.GET_OFFSET_NORMALIZED)}' for d in displays]
+        # return [f'{d.id},{d.get_brightness(raw=opts & Opts.GET_RAW, no_offset_normalized=opts & Opts.GET_NO_OFFSET_NORMALIZED)}' for d in displays]
         return [
             [
                 d.id,
                 d.get_brightness(
                     raw=opts & Opts.GET_RAW,
-                    offset_normalized=opts & Opts.GET_OFFSET_NORMALIZED,
+                    no_offset_normalized=opts & Opts.GET_NO_OFFSET_NORMALIZED,
                 ),
             ]
             for d in displays
@@ -654,7 +652,7 @@ def get_brightness(opts) -> List[int | List[str | int]]:
 
     # either ignore last_set_brightness... {
     values: List[int] = [
-        d.get_brightness(offset_normalized=opts & Opts.GET_OFFSET_NORMALIZED)
+        d.get_brightness(no_offset_normalized=opts & Opts.GET_NO_OFFSET_NORMALIZED)
         for d in displays
     ]
     if same_values(values):
@@ -663,7 +661,7 @@ def get_brightness(opts) -> List[int | List[str | int]]:
     # } ...or use it: {
     # val: int = CONF.state.last_set_brightness
     # if val == -1:  # i.e. we haven't explicitly set it to anything yet
-        # values: List[int] = [d.get_brightness(offset_normalized=opts & Opts.GET_OFFSET_NORMALIZED) for d in displays]
+        # values: List[int] = [d.get_brightness(no_offset_normalized=opts & Opts.GET_NO_OFFSET_NORMALIZED) for d in displays]
     #}
         match CONF.get_strategy:
             case GetStrategy.MEAN:

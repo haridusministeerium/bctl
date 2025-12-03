@@ -10,9 +10,9 @@ from typing import TypeVar
 from asyncio import Task
 from pathlib import Path
 from logging import Logger
-from .common import run_cmd, wait_and_reraise
-from .config import Conf, OffsetType, SimConf
-from .exceptions import ExitableErr, FatalErr
+from bctl.common import run_cmd, wait_and_reraise
+from bctl.config import Conf, OffsetType, SimConf
+from bctl.exceptions import ExitableErr, FatalErr
 
 
 class DisplayType(StrEnum):
@@ -114,17 +114,17 @@ class Display(ABC):
         return self._get_brightness(False, False)
 
     async def adjust_brightness(self, delta: int) -> int:
-        return await self.set_brightness(self._get_brightness(False, True) + delta)
+        return await self.set_brightness(self._get_brightness(False, False) + delta)
 
-    def get_brightness(self, raw: bool = False, offset_normalized: bool = False) -> int:
+    def get_brightness(self, raw: bool = False, no_offset_normalized: bool = False) -> int:
         self.logger.debug(f"getting display [{self.id}] brightness")
-        return self._get_brightness(raw, offset_normalized)
+        return self._get_brightness(raw, no_offset_normalized)
 
-    def _get_brightness(self, raw: bool, offset_normalized: bool) -> int:
+    def _get_brightness(self, raw: bool, no_offset_normalized: bool) -> int:
         return (
-            self.raw_brightness - (round(self.eoffset / 100 * self.max_brightness) if offset_normalized else 0)
+            self.raw_brightness - (0 if no_offset_normalized else round(self.eoffset / 100 * self.max_brightness))
             if raw
-            else round(self.raw_brightness / self.max_brightness * 100) - (self.eoffset if offset_normalized else 0)
+            else round(self.raw_brightness / self.max_brightness * 100) - (0 if no_offset_normalized else self.eoffset)
         )
 
 

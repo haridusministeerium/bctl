@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from pydash import py_
 from datetime import datetime
 from logging import Logger
-from .common import RUNTIME_PATH
+from bctl.common import RUNTIME_PATH
 
 LOGGER: Logger = logging.getLogger(__name__)
 
@@ -164,23 +164,22 @@ def _load_state(conf: Conf) -> State:
 
 async def write_state(conf: Conf, displays: Sequence) -> None:
     offsets = [((d.id, d.name), d.offset) for d in displays]
-    data: dict = {
+    data: State = State.model_validate({
         "timestamp": unix_time_now(),
         "ver": STATE_VER,
         "last_set_brightness": conf.state.last_set_brightness,
         # note we sort by 'name' field length to make sure definitions with
         # 'name' value set would be evaluated against first:
         "offsets": sorted(offsets, key=lambda i: len(i[0][1]), reverse=True)
-    }
+    })
 
     try:
         LOGGER.debug("storing state...")
-        statef = conf.state_f_path
         payload = json.dumps(
-            data, indent=2, sort_keys=True, separators=(",", ": "), ensure_ascii=False
+            data.dict(), indent=2, sort_keys=True, separators=(",", ": "), ensure_ascii=False
         )
 
-        async with aiof.open(statef, mode="w") as f:
+        async with aiof.open(conf.state_f_path, mode="w") as f:
             await f.write(payload)
         LOGGER.debug("...state stored")
     except IOError:

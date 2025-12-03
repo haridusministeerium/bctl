@@ -3,7 +3,7 @@ import logging
 import sys
 import json
 from logging import Logger
-from .common import SOCKET_PATH
+from bctl.common import SOCKET_PATH
 
 
 class Client(object):
