@@ -6,6 +6,11 @@
   and return the _actual_ current brightness of
   displays
 - start using pydantic for config models
+- introduce offset feature
+  allows offsetting certain dispalys' brightnesses from others.
+  useful in cases where some displays, e.g. that of laptop's internal
+  one, is brighter or dimmer than others
+
 
 
 ## 0.0.2 (2025-11-21)

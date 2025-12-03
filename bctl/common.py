@@ -6,14 +6,17 @@ from collections.abc import Sequence
 from enum import IntFlag
 from .exceptions import FatalErr, CmdErr
 
+
 class Opts(IntFlag):
     NO_NOTIFY = 1
     NO_TRACK = 2
-    GET_INDIVIDUAL = 4
-    GET_RAW = 8
-    IGNORE_EXTERNAL = 16
-    IGNORE_INTERNAL = 32
-    # NEXT_OPT = 64
+    IGNORE_EXTERNAL = 4
+    IGNORE_INTERNAL = 8
+    GET_INDIVIDUAL = 16
+    GET_RAW = 32
+    GET_OFFSET_NORMALIZED = 64
+    # NEXT_OPT = 128
+
 
 def _runtime_path() -> str:
     xdg_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
@@ -27,6 +30,7 @@ RUNTIME_PATH = _runtime_path()
 SOCKET_PATH: str = f"{RUNTIME_PATH}/bctld-ipc.sock"
 
 
+# input sequence cannot be empty!
 def same_values(s: Sequence) -> bool:
     return s.count(s[0]) == len(s)
 

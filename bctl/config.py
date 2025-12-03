@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+from enum import StrEnum, auto
 import aiofiles as aiof
 from pydantic import BaseModel
 from datetime import datetime
@@ -45,6 +46,28 @@ class NotifyConf(BaseModel):
     icon: NotifyIconConf = NotifyIconConf()
 
 
+class OffsetType(StrEnum):
+    SOFT = auto()
+    HARD = auto()
+
+
+class OffsetConf(BaseModel):
+    type: OffsetType = OffsetType.HARD
+    offsets: dict[str, int] = {}  # criteria -> offset rules; accepted keys are "internal", "external", "any",
+                                  # model:<model> as in [ddcutil --brief detect] cmd "Monitor:" value
+
+    enabled_if: str = ""  # global rule to disable all offsets if this expression does not evaluate true;
+                          # will be eval()'d in init_displays(), dangerous!
+                          # e.g.:
+                          # - "__import__('socket').gethostname() in ['hostname1', 'hostname2']"
+                          #   or "os.uname().nodename in ['hostname1', 'hostname2']"
+                          # - "DISPLAYS"
+    disabled_if: str = ""  # global rule to disable all offsets if this expression evaluates true;
+                           # will be eval()'d in init_displays(), dangerous!
+                           # e.g.:
+                           # - "len(DISPLAYS) <= 1"
+
+
 class Conf(BaseModel):
     log_lvl: str = "INFO"  # daemon log level, doesn't apply to the client
     ddcutil_bus_path_prefix: str = "/dev/i2c-"  # prefix to the bus number
@@ -68,6 +91,7 @@ class Conf(BaseModel):
     get_strategy: str = "MEAN"  # if displays' brightnesses differ and are queried (via get command), what single value to return to represent current brightness level;
                                 # 'MEAN' = return arithmetic mean, 'LOW' = return lowest, 'HIGH' = return highest
     notify: NotifyConf = NotifyConf()
+    offset: OffsetConf = OffsetConf()
     msg_consumption_window_sec: float = 0.1  # can be set to 0 if no delay/window is required
     brightness_step: int = 5  # %
     ignored_displays: list[str] = []  # either [ddcutil --brief detect] cmd "Monitor:" value, or <device> in /sys/class/backlight/<device>

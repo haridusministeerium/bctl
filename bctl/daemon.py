@@ -104,6 +104,17 @@ async def init_displays() -> None:
         await wait_and_reraise(futures)
 
     DISPLAYS = displays
+    enabled_rule = CONF.offset.enabled_if
+    if enabled_rule and not eval(enabled_rule):
+        LOGGER.debug(f'[{enabled_rule}] evaluated false, disabling offsets...')
+        for d in DISPLAYS:
+            d.offset = 0
+    disabled_rule = CONF.offset.disabled_if
+    if disabled_rule and eval(disabled_rule):
+        LOGGER.debug(f'[{disabled_rule}] evaluated true, disabling offsets...')
+        for d in DISPLAYS:
+            d.offset = 0
+
     LOGGER.debug(
         f"...initialized {len(displays)} display{'' if len(displays) == 1 else 's'}"
     )
@@ -121,7 +132,7 @@ async def init_displays() -> None:
 async def sync_displays() -> None:
     if len(DISPLAYS) <= 1:
         return
-    values: List[int] = [d.get_brightness() for d in DISPLAYS]
+    values: List[int] = [d.get_brightness(offset_normalized=True) for d in DISPLAYS]
     if same_values(values):
         return
 
@@ -149,7 +160,7 @@ async def sync_displays() -> None:
                 case _:
                     prefix = "MODEL:"
                     if s.startswith(prefix):
-                        d = next((d for d in DISPLAYS if d.name == s[s.find(prefix) + len(prefix):]), None)
+                        d = next((d for d in DISPLAYS if d.name == s[len(prefix):]), None)
                         if d: break
                     else:
                         raise FatalErr(f"misconfigured brightness sync strategy [{s}]")
@@ -346,8 +357,10 @@ async def display_op[T](
 
 
 def get_disp_filter(opts: Opts | int) -> Callable[[Display], bool]:
-    return lambda d: not ((opts & Opts.IGNORE_INTERNAL and d.type == DisplayType.INTERNAL)
-                       or opts & Opts.IGNORE_EXTERNAL and d.type == DisplayType.EXTERNAL)
+    return lambda d: not (
+        (opts & Opts.IGNORE_INTERNAL and d.type == DisplayType.INTERNAL)
+        or opts & Opts.IGNORE_EXTERNAL and d.type == DisplayType.EXTERNAL
+    )
 
 
 async def execute_tasks(tasks: List[list]) -> None:
@@ -410,7 +423,7 @@ async def execute_tasks(tasks: List[list]) -> None:
             retries=0,
             on_exception=(init_displays, OnErrOpts.RUN_ON_LAST_TRY),
         )
-        f = lambda d: d.adjust_brightness(delta)
+        f = lambda d: d.set_brightness(d.get_brightness() - d.eoffset + delta)
     else:
         return
 
@@ -611,18 +624,30 @@ def get_brightness(opts) -> List[int | List[str | int]]:
     if not displays:
         return []
     elif opts & Opts.GET_INDIVIDUAL:
-        # return [f'{d.id},{d.get_brightness(opts & Opts.GET_RAW)}' for d in displays]
-        return [[d.id, d.get_brightness(opts & Opts.GET_RAW)] for d in displays]
+        # return [f'{d.id},{d.get_brightness(raw=opts & Opts.GET_RAW, offset_normalized=opts & Opts.GET_OFFSET_NORMALIZED)}' for d in displays]
+        return [
+            [
+                d.id,
+                d.get_brightness(
+                    raw=opts & Opts.GET_RAW,
+                    offset_normalized=opts & Opts.GET_OFFSET_NORMALIZED,
+                ),
+            ]
+            for d in displays
+        ]
 
     # either ignore last_set_brightness... {
-    values: List[int] = [d.get_brightness() for d in displays]
+    values: List[int] = [
+        d.get_brightness(offset_normalized=opts & Opts.GET_OFFSET_NORMALIZED)
+        for d in displays
+    ]
     if same_values(values):
         val = values[0]
     else:
     # } ...or use it: {
     # val: int = CONF.state.last_set_brightness
     # if val == -1:  # i.e. we haven't explicitly set it to anything yet
-        # values: List[int] = [d.get_brightness() for d in displays]
+        # values: List[int] = [d.get_brightness(offset_normalized=opts & Opts.GET_OFFSET_NORMALIZED) for d in displays]
     #}
         match CONF.get_strategy:
             case "MEAN":

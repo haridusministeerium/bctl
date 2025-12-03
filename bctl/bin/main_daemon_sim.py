@@ -24,13 +24,15 @@ def main(debug, number, wait, brightness, fail, exit) -> None:
     assert fail in failmodes + [None], f"allowed failmodes are {failmodes}"
     assert number >= 0, "exit code needs to be >= 0"
 
-    sim: SimConf = SimConf.model_validate({
-        "ndisplays": number,
-        "wait_sec": wait,
-        "initial_brightness": brightness,
-        "failmode": fail,
-        "exit_code": exit,
-    })
+    sim: SimConf = SimConf.model_validate(
+        {
+            "ndisplays": number,
+            "wait_sec": wait,
+            "initial_brightness": brightness,
+            "failmode": fail,
+            "exit_code": exit,
+        }
+    )
 
     daemon.main(debug, sim)
 
