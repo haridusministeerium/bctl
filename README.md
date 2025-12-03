@@ -2,8 +2,7 @@
 
 This is a simple daemon for controlling displays' brightnesses. It
 consists of a daemon process listening for user requests (e.g. changing brightness)
-and a client to send commands to the daemon. udev events are monitored
-for screen (dis)connections. Desktop notifications are shown on brightness change.
+and a client to send commands to the daemon.
 
 ## Installation
 
@@ -12,6 +11,16 @@ for screen (dis)connections. Desktop notifications are shown on brightness chang
 > [!NOTE]
 > This will install the client & daemon executables, but it's user responsibility
 to launch the daemon process, covered below.
+
+## Features
+
+- control all displays, optionally blacklisting either class of screens or
+  specific models
+- monitor udev events and reinitialize on screen (dis)connections
+- send desktop notifications on brightness change
+- automatically synchronize screen brightnesses
+- configure extra offsets to keep specific screen brightness higher or lower than
+  the rest; could be useful e.g. with laptops whose displays tend to be dimmer.
 
 ## Why?
 
@@ -30,9 +39,6 @@ method -- ddcutil -- takes in some cases non-trivial amount of time to execute
 
 As this solution caches set brightness values there's no need to query it
 from ddcutil, making e.g. desktop notification generation simpler.
-
-Also screen connections & disconnections are kept track of via an udev monitor,
-and there's an option to force all the screens' brightnesses to be kept in sync.
 
 ## Managing external displays
 
@@ -211,6 +217,7 @@ defaults, but the most important ones you might want to be aware of or change ar
 | `main_display_ctl` | str | ddcutil | backend for brightness control |
 | `internal_display_ctl` | str | raw | backend for controlling internal display |
 | `notify.icon.root_dir` | str | '' | notification icon directory |
+| `offset.offsets` | dict | {} | positive or negative brightness offset for displays matching given criteria |
 | `fatal_exit_code` | int | 100 | error code daemon should exit with when restart shouldn't be attempted. you might want to use this value in systemd unit file w/ [`RestartPreventExitStatus`](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html#RestartPreventExitStatus=) config |
 
 #### `msg_consumption_window_sec`
