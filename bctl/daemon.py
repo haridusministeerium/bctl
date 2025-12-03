@@ -113,6 +113,12 @@ async def init_displays() -> None:
     if displays:
         futures: List[Task[None]] = [asyncio.create_task(d.init()) for d in displays]
         await wait_and_reraise(futures)
+        for d in displays:
+            for o in CONF.state.offsets:
+                id, name = o[0]
+                if (name and d.name == name) or d.id == id:
+                    d.eoffset = o[1]
+                    break
 
     DISPLAYS = displays
     enabled_rule = CONF.offset.enabled_if
@@ -120,11 +126,13 @@ async def init_displays() -> None:
         LOGGER.debug(f"[{enabled_rule}] evaluated false, disabling offsets...")
         for d in DISPLAYS:
             d.offset = 0
+            d.eoffset = 0
     disabled_rule = CONF.offset.disabled_if
     if disabled_rule and eval(disabled_rule):
         LOGGER.debug(f"[{disabled_rule}] evaluated true, disabling offsets...")
         for d in DISPLAYS:
             d.offset = 0
+            d.eoffset = 0
 
     LOGGER.debug(
         f"...initialized {len(displays)} display{'' if len(displays) == 1 else 's'}"
@@ -134,7 +142,7 @@ async def init_displays() -> None:
         await sync_displays()
     # TODO: is resetting last_set_brightness reasonable here? even when a new display
     #       gets connected, doesn't it still remain our last requested brightness target?
-    elif not same_values([d.get_brightness() for d in DISPLAYS]):
+    elif not same_values([d.get_brightness(offset_normalized=True) for d in DISPLAYS]):
         CONF.state.last_set_brightness = -1  # reset, as potentially newly added display could have a different value
 
     LAST_INIT_TIME = unix_time_now()
@@ -177,7 +185,7 @@ async def sync_displays() -> None:
                         raise FatalErr(f"misconfigured brightness sync strategy [{s}]")
 
         if d is not None:
-            target = d.get_brightness()
+            target = d.get_brightness(offset_normalized=True)
         elif target == -1:
             LOGGER.info(
                 f"cannot sync brightnesses as no displays detected for sync strategy [{strat}]"
@@ -460,10 +468,11 @@ async def execute_tasks(tasks: List[list]) -> None:
     #}
 
     brightnesses: List[int] = sorted([f.result() for f in futures])
-    if not opts & Opts.NO_TRACK and (brightnesses[0] - brightnesses[-1]) <= 2:
+    if not opts & Opts.NO_TRACK and (brightnesses[-1] - brightnesses[0]) <= 2:
+        print(f'yooooooooooooo: {brightnesses}')
         CONF.state.last_set_brightness = brightnesses[0]
     if not opts & Opts.NO_NOTIFY:
-        await NOTIF.notify_change(brightnesses[0])
+        await NOTIF.notify_change(brightnesses[0])  # TODO: shouldn't we consolidate the value?
     if CONF.sync_brightness:
         await sync_displays()
 
@@ -618,7 +627,7 @@ async def terminate():
     await TASK_QUEUE.put(["kill"])
     # alternatively, ignore existing queue and terminate immediately:
     # try:
-        # await write_state(CONF)
+        # await write_state(CONF, DISPLAYS)
     # finally:
         # os._exit(0)
 
@@ -733,7 +742,7 @@ async def run() -> None:
             await NOTIF.notify_err(e)
         sys.exit(1)
     finally:
-        await write_state(CONF)
+        await write_state(CONF, DISPLAYS)
 
 
 # top-level err handler that's caught for stuff ran prior to task group.

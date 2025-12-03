@@ -35,7 +35,7 @@ class Display(ABC):
         self.type: DisplayType = dt
         self.backend: BackendType = bt
         self.conf: Conf = conf
-        self.name: str = "UNKNOWN"  # for ddcutil detect, it's the 'Monitor:' value
+        self.name: str = ""  # for ddcutil detect, it's the 'Monitor:' value; for laptop display it'll likely be empty
         self.raw_brightness: int = -1  # raw, i.e. potentially not a percentage
         self.max_brightness: int = -1
         self.logger: Logger = logging.getLogger(f"{type(self).__name__}.{self.id}")

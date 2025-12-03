@@ -2,6 +2,7 @@ import os
 import glob
 import json
 import logging
+from typing import Sequence, List
 from enum import StrEnum, auto
 import aiofiles as aiof
 from pydantic import BaseModel
@@ -28,6 +29,7 @@ class State(BaseModel):
     ver: int = -1
     last_set_brightness: int = -1  # value we've set all displays' brightnesses (roughly) to;
                                    # -1 if brightnesses differ or we haven't set brightness using bctl yet
+    offsets: List[tuple[tuple[str, str], int]] = []   # ((display.id, display.name), eoffset) mappings
 
 
 class NotifyIconConf(BaseModel):
@@ -160,11 +162,15 @@ def _load_state(conf: Conf) -> State:
     return State()
 
 
-async def write_state(conf: Conf) -> None:
+async def write_state(conf: Conf, displays: Sequence) -> None:
+    offsets = [((d.id, d.name), d.offset) for d in displays]
     data: dict = {
         "timestamp": unix_time_now(),
         "ver": STATE_VER,
-        "last_set_brightness": conf.state.last_set_brightness,  # note value from current state
+        "last_set_brightness": conf.state.last_set_brightness,
+        # note we sort by 'name' field length to make sure definitions with
+        # 'name' value set would be evaluated against first:
+        "offsets": sorted(offsets, key=lambda i: len(i[0][1]), reverse=True)
     }
 
     try:
