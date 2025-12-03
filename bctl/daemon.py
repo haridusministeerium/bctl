@@ -151,8 +151,9 @@ async def init_displays() -> None:
 async def sync_displays() -> None:
     if len(DISPLAYS) <= 1:
         return
-    values: List[int] = [d.get_brightness() for d in DISPLAYS]
-    if same_values(values):
+    values: List[int] = sorted([d.get_brightness() for d in DISPLAYS])
+    #if same_values(values):
+    if values[-1] - values[0] <= 1:  # allow for some flex
         return
 
     target: int = CONF.state.last_set_brightness
@@ -467,7 +468,7 @@ async def execute_tasks(tasks: List[list]) -> None:
     #}
 
     brightnesses: List[int] = sorted([f.result() for f in futures])
-    if not opts & Opts.NO_TRACK and (brightnesses[-1] - brightnesses[0]) <= 2:
+    if not opts & Opts.NO_TRACK and (brightnesses[-1] - brightnesses[0]) <= 1:
         CONF.state.last_set_brightness = brightnesses[0]
     if not opts & Opts.NO_NOTIFY:
         await NOTIF.notify_change(brightnesses[0])  # TODO: shouldn't we consolidate the value?
