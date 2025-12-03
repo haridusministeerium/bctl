@@ -40,7 +40,7 @@ from .common import (
     Opts,
     SOCKET_PATH,
 )
-from .config import Conf, SimConf, load_config, write_state, unix_time_now
+from .config import Conf, SimConf, load_config, write_state, unix_time_now, MainDisplayCtl, InternalDisplayCtl, GetStrategy
 from .exceptions import ExitableErr, FatalErr, PayloadErr, CmdErr, RetriableException
 from .notify import Notif
 
@@ -55,9 +55,9 @@ LAST_INIT_TIME: int = 0
 
 def validate_ext_deps() -> None:
     requirements = [CONF.main_display_ctl, CONF.internal_display_ctl]
-    for dep in ["DDCUTIL", "BRILLO", "BRIGHTNESSCTL"]:
+    for dep in ["ddcutil", "brillo", "brightnessctl"]:
         if dep in requirements:
-            assert_cmd_exist(dep.lower())
+            assert_cmd_exist(dep)
 
 
 async def init_displays() -> None:
@@ -73,18 +73,14 @@ async def init_displays() -> None:
 
     displays: Sequence[Display]
     match CONF.main_display_ctl:
-        case "DDCUTIL":
+        case MainDisplayCtl.DDCUTIL:
             displays = await get_ddcutil_displays(ignore_internal)
-        case "RAW":
+        case MainDisplayCtl.RAW:
             displays = await get_raw_displays()
-        case "BRIGHTNESSCTL":
+        case MainDisplayCtl.BRIGHTNESSCTL:
             displays = await get_bctl_displays()
-        case "BRILLO":
+        case MainDisplayCtl.BRILLO:
             displays = await get_brillo_displays()
-        case _:
-            raise FatalErr(
-                f"misconfigured display brightness management method [{CONF.main_display_ctl}]"
-            )
 
     if ignore_internal:
         displays = list(filter(lambda d: d.type != DisplayType.INTERNAL, displays))
@@ -142,23 +138,23 @@ async def sync_displays() -> None:
         strat = CONF.sync_strategy
         for s in strat:
             match s:
-                case "MEAN":
+                case "mean":
                     target = int(fmean(values))
                     break
-                case "LOW":
+                case "low":
                     target = min(values)
                     break
-                case "HIGH":
+                case "high":
                     target = max(values)
                     break
-                case "INTERNAL":
+                case "internal":
                     d = next((d for d in DISPLAYS if d.type == DisplayType.INTERNAL), None)
                     if d: break
-                case "EXTERNAL":
+                case "external":
                     d = next((d for d in DISPLAYS if d.type == DisplayType.EXTERNAL), None)
                     if d: break
                 case _:
-                    prefix = "MODEL:"
+                    prefix = "model:"
                     if s.startswith(prefix):
                         d = next((d for d in DISPLAYS if d.name == s[len(prefix):]), None)
                         if d: break
@@ -320,16 +316,12 @@ async def get_ddcutil_displays(ignore_internal: bool) -> List[Display]:
                 r"\s+DRM connector:\s+[a-z0-9]+-eDP-\d+", line
             ):  # i.e. "is this a laptop display?"
                 match CONF.internal_display_ctl:
-                    case "RAW":
+                    case InternalDisplayCtl.RAW:
                         displays.append(await resolve_single_internal_display_raw())
-                    case "BRIGHTNESSCTL":
+                    case InternalDisplayCtl.BRIGHTNESSCTL:
                         displays.append(await resolve_single_internal_display_bctl())
-                    case "BRILLO":
+                    case InternalDisplayCtl.BRILLO:
                         displays.append(await resolve_single_internal_display_brillo())
-                    case _:
-                        raise FatalErr(
-                            f"misconfigured internal display brightness management method [{CONF.internal_display_ctl}]"
-                        )
                 in_invalid_block = False
         elif line.startswith("Display "):
             d = DDCDisplay(line.strip(), CONF)
@@ -650,16 +642,12 @@ def get_brightness(opts) -> List[int | List[str | int]]:
         # values: List[int] = [d.get_brightness(offset_normalized=opts & Opts.GET_OFFSET_NORMALIZED) for d in displays]
     #}
         match CONF.get_strategy:
-            case "MEAN":
+            case GetStrategy.MEAN:
                 val = int(fmean(values))
-            case "LOW":
+            case GetStrategy.LOW:
                 val = min(values)
-            case "HIGH":
+            case GetStrategy.HIGH:
                 val = max(values)
-            case _:
-                raise FatalErr(
-                    f"misconfigured brightness get strategy [{CONF.get_strategy}]"
-                )
 
     return [val]
 

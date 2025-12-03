@@ -206,8 +206,8 @@ defaults, but the most important ones you might want to be aware of or change ar
 | `udev_event_debounce_sec` | float | 3.0 | udev event debounce window in seconds |
 | `brightness_step` | int | 5 | percentage to bump brightness up or down per change |
 | `sync_brightness` | bool | False | whether to keep screens' brightnesses in sync |
-| `main_display_ctl` | str | DDCUTIL | backend for brightness control |
-| `internal_display_ctl` | str | RAW | backend for controlling internal display |
+| `main_display_ctl` | str | ddcutil | backend for brightness control |
+| `internal_display_ctl` | str | raw | backend for controlling internal display |
 | `notify.icon.root_dir` | str | '' | notification icon directory |
 | `fatal_exit_code` | int | 100 | error code daemon should exit with when restart shouldn't be attempted. you might want to use this value in systemd unit file w/ [`RestartPreventExitStatus`](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html#RestartPreventExitStatus=) config |
 
@@ -221,23 +221,23 @@ Defines an event consumption window, meaning if say 'brightness up' key is spamm
 #### `main_display_ctl`
 
 This config sets the main backend for controlling the brightness. Available options:
-- `DDCUTIL` - controls _external_ displays via ddcutil, requires
+- `ddcutil` - controls _external_ displays via ddcutil, requires
   [`ddcutil`](https://github.com/rockowitz/ddcutil) to be on PATH, described above.
-- `RAW` - all displays are controlled via the device interfaces under `/sys/class/backlight`
+- `raw` - all displays are controlled via the device interfaces under `/sys/class/backlight`
   directory. In order to control external displays using this backend, you'd
   likely need the installation of [`ddcci` kernel driver](https://gitlab.com/ddcci-driver-linux/ddcci-driver-linux),
   described above.
-- `BRIGHTNESSCTL` - all displays are controlled via [`brightnessctl`](https://github.com/Hummer12007/brightnessctl)
+- `brightnessctl` - all displays are controlled via [`brightnessctl`](https://github.com/Hummer12007/brightnessctl)
   program.
-- `BRILLO` - all displays are controlled via [`brillo`](https://gitlab.com/cameronnemo/brillo)
+- `brillo` - all displays are controlled via [`brillo`](https://gitlab.com/cameronnemo/brillo)
   program.
 
 #### `internal_display_ctl`
 
 This config sets the backend used only for controlling the internal display
 brightness, as that's not what ddcutil does. Only in effect if
-`main_display_ctl=DDCUTIL` and we're running on a laptop. Available options are
-`RAW | BRIGHTNESSCTL | BRILLO`
+`main_display_ctl=ddcutil` and we're running on a laptop. Available options are
+`raw | brightnessctl | brillo`
 
 #### `notify.icon.root_dir`
 

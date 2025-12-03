@@ -68,6 +68,25 @@ class OffsetConf(BaseModel):
                            # - "len(DISPLAYS) <= 1"
 
 
+class MainDisplayCtl(StrEnum):
+    DDCUTIL = auto()
+    RAW = auto()
+    BRIGHTNESSCTL = auto()
+    BRILLO = auto()
+
+
+class InternalDisplayCtl(StrEnum):
+    RAW = auto()
+    BRIGHTNESSCTL = auto()
+    BRILLO = auto()
+
+
+class GetStrategy(StrEnum):
+    MEAN = auto()  # return arithmetic mean
+    LOW = auto()   # return lowest
+    HIGH = auto()  # return highest
+
+
 class Conf(BaseModel):
     log_lvl: str = "INFO"  # daemon log level, doesn't apply to the client
     ddcutil_bus_path_prefix: str = "/dev/i2c-"  # prefix to the bus number
@@ -80,16 +99,15 @@ class Conf(BaseModel):
     udev_event_debounce_sec: float = 3.0  # both for debouncing & delay; have experienced missed ext. display detection w/ 1.0, but it's flimsy regardless
     periodic_init_sec: int = 0  # periodically re-init/re-detect monitors; 0 to disable
     sync_brightness: bool = False  # keep all displays' brightnesses at same value/synchronized
-    sync_strategy: list[str] = ["MEAN"]  # if displays' brightnesses differ and are synced, what value to sync them to; only active if sync_brightness=True;
-                                # first matched strategy is used, i.e. can define as ["MODEL:AUS:PA278QV:L9GMQA215221", "INTERNAL", "MEAN"]
-                                # - MEAN = set to arithmetic mean
-                                # - LOW = set to lowest
-                                # - HIGH = set to highest
-                                # - INTERNAL = set to the internal screen value
-                                # - EXTERNAL = set to _a_ external screen value
-                                # - MODEL:<model> = set to <model> screen value; <model> being [ddcutil --brief detect] cmd "Monitor:" value
-    get_strategy: str = "MEAN"  # if displays' brightnesses differ and are queried (via get command), what single value to return to represent current brightness level;
-                                # 'MEAN' = return arithmetic mean, 'LOW' = return lowest, 'HIGH' = return highest
+    sync_strategy: list[str] = ["mean"]  # if displays' brightnesses differ and are synced, what value to sync them to; only active if sync_brightness=True;
+                                # first matched strategy is used, i.e. can define as ["model:AUS:PA278QV:L9GMQA215221", "internal", "mean"]
+                                # - mean = set to arithmetic mean
+                                # - low = set to lowest
+                                # - high = set to highest
+                                # - internal = set to the internal screen value
+                                # - external = set to _a_ external screen value
+                                # - model:<model> = set to <model> screen value; <model> being [ddcutil --brief detect] cmd "Monitor:" value
+    get_strategy: GetStrategy = GetStrategy.MEAN  # if displays' brightnesses differ and are queried (via get command), what single value to return to represent current brightness level;
     notify: NotifyConf = NotifyConf()
     offset: OffsetConf = OffsetConf()
     msg_consumption_window_sec: float = 0.1  # can be set to 0 if no delay/window is required
@@ -97,10 +115,10 @@ class Conf(BaseModel):
     ignored_displays: list[str] = []  # either [ddcutil --brief detect] cmd "Monitor:" value, or <device> in /sys/class/backlight/<device>
     ignore_internal_display: bool = False  # do not control internal (i.e. laptop) display if available
     ignore_external_display: bool = False  # do not control external display(s) if available
-    main_display_ctl: str = "DDCUTIL"  # RAW | DDCUTIL | BRIGHTNESSCTL | BRILLO
-    internal_display_ctl: str = "RAW"  # RAW | BRIGHTNESSCTL | BRILLO;  only used if main_display_ctl=DDCUTIL and we're a laptop
-    raw_device_dir: str = "/sys/class/backlight"  # used if main_display_ctl=RAW OR
-                                                  # (main_display_ctl=DDCUTIL AND internal_display_ctl=RAW AND we're a laptop)
+    main_display_ctl: MainDisplayCtl = MainDisplayCtl.DDCUTIL
+    internal_display_ctl: InternalDisplayCtl = InternalDisplayCtl.RAW  # only used if main_display_ctl=ddcutil and we're a laptop
+    raw_device_dir: str = "/sys/class/backlight"  # used if main_display_ctl=raw OR
+                                                  # (main_display_ctl=ddcutil AND internal_display_ctl=raw AND we're a laptop)
     fatal_exit_code: int = 100  # exit code signifying fatal exit that should not be retried;
                                 # you might want to use this value in systemd unit file w/ RestartPreventExitStatus config
     sim: SimConf | None = None  # simulation config, will be set by sim client
