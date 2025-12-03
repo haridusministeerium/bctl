@@ -38,7 +38,6 @@ class Display(ABC):
         self.name: str = "UNKNOWN"  # for ddcutil detect, it's the 'Monitor:' value
         self.raw_brightness: int = -1  # raw, i.e. potentially not a percentage
         self.max_brightness: int = -1
-        self.min_brightness: int = 0
         self.logger: Logger = logging.getLogger(f"{type(self).__name__}.{self.id}")
         self.offset: int = 0  # percent
         self.eoffset: int = 0  # effective offset, percent
@@ -101,12 +100,6 @@ class Display(ABC):
             value = target
 
         value = round(value / 100 * self.max_brightness)  # convert to raw
-
-        # TODO: this bound-checking is no longer needed due to checing at the top, right?:
-        # if value < self.min_brightness:
-            # value = self.min_brightness
-        # elif value > self.max_brightness:
-            # value = self.max_brightness
 
         if value != self.raw_brightness:
             self.logger.debug(
@@ -256,12 +249,10 @@ class BrilloDisplay(NonDDCDisplay):
         futures: list[Task[int]] = [
             asyncio.create_task(self._get_device_attr("b")),  # current brightness
             asyncio.create_task(self._get_device_attr("m")),  # max
-            asyncio.create_task(self._get_device_attr("c")),  # min
         ]
         await wait_and_reraise(futures)
         self.raw_brightness = futures[0].result()
         self.max_brightness = futures[1].result()
-        self.min_brightness = futures[2].result()
         assert self.max_brightness >= self.raw_brightness, (
             "max_brightness cannot be smaller than raw_brightness"
         )
