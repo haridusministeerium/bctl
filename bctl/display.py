@@ -114,121 +114,23 @@ class Display(ABC):
             )
             await self._set_brightness(value)
             self.raw_brightness = value
-        return self.get_brightness()
+        return self._get_brightness(False, False)
+
 
     async def adjust_brightness(self, delta: int) -> int:
-        b: int = round(self.raw_brightness / self.max_brightness * 100)  # percentage
-        additional_offset = 0
-
-        if delta > 0:
-            hard_limit = 100 - self.offset
-            hard_limit2 = hard_limit * 2  # to allow other screens to reach 100%
-            # if b == 100:
-            if self.offset <= 0:
-                additional_offset: int = max(self.offset - self.eoffset, -delta)
-                if self.conf.offset.type == OffsetType.SOFT:
-                    target: int = min(100, b + delta + additional_offset)
-                    d = delta + additional_offset  # remove the "dead" buffer where only offset is increased
-                    d = min(d, 100 - b)   # asked/input delta might be more than is available 'til max, hence min()
-                    over_limit_d = min(0, (100 + self.offset) - (b + d))  # how much _over_ the limit to go
-                else:  # OffsetType.HARD
-                    target: int = min(100 + self.offset, b + delta + additional_offset)
-                    over_limit_d = 0
-                self.eoffset += additional_offset - over_limit_d
-            else:  # offset > 0
-                if self.offset and self.eoffset == 3 * self.offset:
-                    return self.get_brightness()  # we've hit abolute limit at the high-end (that's only achievable with OffsetType.SOFT
-                target = min(100, b + delta)
-                additional_offset = min(self.offset - self.eoffset, delta)  # in case we're overextended on low end and need to give some offset back
-                if additional_offset > 0:
-                    print(f"     -> additional offset: {additional_offset}")
-                    new_target_plus_offset = min(100, target + additional_offset)
-                    # the actual _extra_ is what can be added back to the offset; note this causes effective delta to be more than asked delta:
-                    self.eoffset += new_target_plus_offset - target
-                    target = new_target_plus_offset
-                # elif target > hard_limit2:
-                    # return self.get_brightness()
-
-                # delta = b
-                # limit = target - b
-                # limit = target - hard_limit
-                # if limit > 0: # and :
-                print(f"     -> target {target}")
-                if target > hard_limit:
-                    # e = target - self.offset + self.eoffset
-                    e = target + self.eoffset
-                    f = e - hard_limit
-                    # if target == 100 and self.eoffset == self.offset:
-                        # f -= self.offset
-                    if target == 100:
-                        self.eoffset += delta
-                        # f -= self.offset
-                    print(f"          e: {e}; f: {f}")
-                    virtual_brightness = b + self.eoffset - self.offset
-                    # f = virtual_brightness - hard_limit
-                    print(
-                        f"     -> virt_b: {virtual_brightness};   min({100 + 3 * self.offset}, {b + delta})"
-                    )
-
-                    d = min(100 + 3 * self.offset, b + delta)  # + self.eoffset)
-                    #d = min(100 + 3 * self.offset, min(b + delta, b + self.offset)) # + self.eoffset)
-                    # self.eoffset += d - 100
-                    # self.eoffset += f
-                    print(
-                        f"     -> d = {d}, target {target} hard_limit {hard_limit} eoffset by {d - 100}"
-                    )
-
-        else:  # delta <= 0
-            if self.offset >= 0:
-                if self.offset:
-                    if self.eoffset == 3 * self.offset:
-                        additional_offset = max(self.offset - self.eoffset, -delta)
-                    else:
-                        additional_offset = min(self.offset - self.eoffset, -delta)
-
-                if self.conf.offset.type == OffsetType.SOFT:
-                    if self.offset and self.eoffset == 3 * self.offset:
-                        target = min(100, b + delta + self.eoffset)# + additional_offset)  # <-- TODO: commented tail out in latest (Mon) edit!
-                    else:
-                        target = max(0, b + delta)# + additional_offset)  # <-- TODO: commented tail out in latest (Mon) edit!
-
-                    d = delta + additional_offset  # remove the "dead" buffer where only offset is increased
-                    d = max(d, 0 - b)   # asked/input delta might be more than is available 'til min, hence max()
-                    over_limit_d = max(0, (0 + self.offset) - (b + d))  # how much _over_ the limit to go
-                    # TODO: shouldn't additional_offset really be function of new $target?
-                    # e.g. w/ offset 5, going from 5 to 0, our eoffset will be 5 += (additional_offset - over_limit_d) = (0 - 5) = -5
-                    # e.g. w/ offset 5, going from 100 to 95, our eoffset will be 10 += (additional_offset - over_limit_d) = (-5 - 0) = -5
-                    # or when we're fully extended towards high:
-                    # TODO: following is wrong!!! we still want eoffset to be 15 += -5!
-                    # e.g. w/ offset 5, going from 100 to 95, our eoffset will be 15 += (additional_offset - over_limit_d) = (-10 - 0) = -10
-                    print(
-                        f"     -> !additional offset: {additional_offset}, over_limit_d = {over_limit_d}; new eoffset will be {self.eoffset} += {additional_offset - over_limit_d}, target: {target}"
-                    )
-                else:  # OffsetType.HARD
-                    target = max(0 + self.offset, b + delta + additional_offset)
-                    over_limit_d = 0
-                self.eoffset += additional_offset - over_limit_d
-            else:  # offset < 0
-                target = max(0, b + delta)
-                additional_offset = max(self.offset - self.eoffset, delta)  # in case we're overextended on high end and need to give some offset back
-                if additional_offset:
-                    new_target_plus_offset = max(0, target + additional_offset)
-                    # the actual _extra_ is what can be added back to the offset; note this causes effective delta to be more than asked delta:
-                    self.eoffset += new_target_plus_offset - target
-                    target = new_target_plus_offset
-
-        target = round(target / 100 * self.max_brightness)  # convert to raw value
-        self.logger.debug(
-            f"adjusting display [{self.id}] brightness to {target} ({round(target / self.max_brightness * 100)}%), offset {self.offset}, eoffset {self.eoffset}..."
+        return await self.set_brightness(
+            self._get_brightness(False, True) + delta
         )
-        await self._set_brightness(target)
-        self.raw_brightness = target
-        return self.get_brightness()
+
 
     def get_brightness(self, raw: bool = False, offset_normalized: bool = False) -> int:
+        self.logger.debug(f"getting display [{self.id}] brightness")
+        return self._get_brightness(raw, offset_normalized)
+
+
+    def _get_brightness(self, raw: bool, offset_normalized: bool) -> int:
         if self.raw_brightness == -1:
             raise FatalErr(f"[{self.id}] appears to be uninitialized")
-        self.logger.debug(f"getting display [{self.id}] brightness")
 
         return (
             self.raw_brightness - (round(self.eoffset / 100 * self.max_brightness) if offset_normalized else 0)

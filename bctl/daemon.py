@@ -415,7 +415,7 @@ async def execute_tasks(tasks: List[list]) -> None:
             retries=0,
             on_exception=(init_displays, OnErrOpts.RUN_ON_LAST_TRY),
         )
-        f = lambda d: d.set_brightness(d.get_brightness() - d.eoffset + delta)
+        f = lambda d: d.adjust_brightness(delta)
     else:
         return
 
