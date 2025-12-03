@@ -83,16 +83,12 @@ class Display(ABC):
         if self.offset != 0:
             if self.offset < 0:
                 if self.conf.offset.type == OffsetType.SOFT and orig_value > 100:
-                    # TODO: unsure which one is better:
-                    target = 100
-                    # target = min(100, orig_value + self.offset)
+                    target = min(100, orig_value + self.eoffset)
                 else:
                     target = max(0, value + self.offset)
             else:  # offset > 0
                 if self.conf.offset.type == OffsetType.SOFT and orig_value < 0:
-                    # TODO: unsure which one is better:
-                    target = 0
-                    # target = max(0, orig_value + self.offset)
+                    target = max(0, orig_value + self.eoffset)
                 else:
                     target = min(100, value + self.offset)
             self.eoffset = target - value
