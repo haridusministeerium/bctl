@@ -116,17 +116,12 @@ class Display(ABC):
             self.raw_brightness = value
         return self._get_brightness(False, False)
 
-
     async def adjust_brightness(self, delta: int) -> int:
-        return await self.set_brightness(
-            self._get_brightness(False, True) + delta
-        )
-
+        return await self.set_brightness(self._get_brightness(False, True) + delta)
 
     def get_brightness(self, raw: bool = False, offset_normalized: bool = False) -> int:
         self.logger.debug(f"getting display [{self.id}] brightness")
         return self._get_brightness(raw, offset_normalized)
-
 
     def _get_brightness(self, raw: bool, offset_normalized: bool) -> int:
         if self.raw_brightness == -1:

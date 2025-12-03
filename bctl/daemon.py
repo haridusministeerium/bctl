@@ -40,7 +40,16 @@ from .common import (
     Opts,
     SOCKET_PATH,
 )
-from .config import Conf, SimConf, load_config, write_state, unix_time_now, MainDisplayCtl, InternalDisplayCtl, GetStrategy
+from .config import (
+    Conf,
+    SimConf,
+    load_config,
+    write_state,
+    unix_time_now,
+    MainDisplayCtl,
+    InternalDisplayCtl,
+    GetStrategy,
+)
 from .exceptions import ExitableErr, FatalErr, PayloadErr, CmdErr, RetriableException
 from .notify import Notif
 
@@ -89,7 +98,13 @@ async def init_displays() -> None:
 
     ignored_displays = CONF.ignored_displays
     if ignored_displays:
-        displays = list(filter(lambda d: d.id not in ignored_displays and d.name not in ignored_displays, displays))
+        displays = list(
+            filter(
+                lambda d: d.id not in ignored_displays
+                and d.name not in ignored_displays,
+                displays,
+            )
+        )
 
     if len(list(filter(lambda d: d.type == DisplayType.INTERNAL, displays))) > 1:
         # TODO: shouldn't this exit fatally?
@@ -102,12 +117,12 @@ async def init_displays() -> None:
     DISPLAYS = displays
     enabled_rule = CONF.offset.enabled_if
     if enabled_rule and not eval(enabled_rule):
-        LOGGER.debug(f'[{enabled_rule}] evaluated false, disabling offsets...')
+        LOGGER.debug(f"[{enabled_rule}] evaluated false, disabling offsets...")
         for d in DISPLAYS:
             d.offset = 0
     disabled_rule = CONF.offset.disabled_if
     if disabled_rule and eval(disabled_rule):
-        LOGGER.debug(f'[{disabled_rule}] evaluated true, disabling offsets...')
+        LOGGER.debug(f"[{disabled_rule}] evaluated true, disabling offsets...")
         for d in DISPLAYS:
             d.offset = 0
 

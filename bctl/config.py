@@ -205,6 +205,5 @@ def _read_dict_from_file(file_loc: str) -> dict:
         return {}
 
 
-
 def unix_time_now() -> int:
     return int(datetime.now().timestamp())
