@@ -6,7 +6,8 @@ from bctl.config import SimConf
 
 
 @click.command
-@click.option("--debug", is_flag=True, help="Enables logging at debug level.")
+@click.option("--debug", is_flag=True, help="log at debug level")
+@click.option("--state/--no-state", default=True, help="whether persisted state should be loaded")
 @click.option("-n", "--number", default=3, help="Number of simulated displays")
 @click.option(
     "-w",
@@ -18,7 +19,15 @@ from bctl.config import SimConf
 @click.option("-b", "--brightness", help="Initial brightness", default=50)
 @click.option("-f", "--fail", type=str, help="Failure mode to simulate")
 @click.option("-e", "--exit", default=1, help="code to exit chosen failmode with")
-def main(debug, number, wait, brightness, fail, exit) -> None:
+def main(
+    debug: bool,
+    state: bool,
+    number: int,
+    wait: float,
+    brightness: int,
+    fail: str,
+    exit: int,
+) -> None:
     failmodes = ["i", "s"]
     assert number > 0, "number of simulated displays must be positive"
     assert fail in failmodes + [None], f"allowed failmodes are {failmodes}"
@@ -34,7 +43,7 @@ def main(debug, number, wait, brightness, fail, exit) -> None:
         }
     )
 
-    daemon.main(debug, sim)
+    daemon.main(debug, state, sim)
 
 
 if __name__ == "__main__":

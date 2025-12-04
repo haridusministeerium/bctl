@@ -113,6 +113,7 @@ async def init_displays() -> None:
     if displays:
         futures: List[Task[None]] = [asyncio.create_task(d.init()) for d in displays]
         await wait_and_reraise(futures)
+        # hydrate the eoffsets from state:
         for d in displays:
             for o in CONF.state.offsets:
                 id, name = o[0]
@@ -142,6 +143,9 @@ async def init_displays() -> None:
         await sync_displays()
     # TODO: is resetting last_set_brightness reasonable here? even when a new display
     #       gets connected, doesn't it still remain our last requested brightness target?
+    #       suppose only place where reset is required is if our get_brightness()
+    #       returns the last_set_brightness if it's set, which in this case would
+    #       become invalid. so it really depends on how last_set_brightness is used.
     elif not same_values([d.get_brightness() for d in DISPLAYS]):
         CONF.state.last_set_brightness = -1  # reset, as potentially newly added display could have a different value
 
@@ -758,7 +762,7 @@ def root_exception_handler(
     sys.__excepthook__(type_, value, tbt)
 
 
-def main(debug=False, sim_conf: SimConf | None = None) -> None:
+def main(debug: bool, load_state: bool, sim_conf: SimConf | None = None) -> None:
     global SINGLETON_LOCK
     global TASK_QUEUE
     global LOCK
@@ -771,7 +775,7 @@ def main(debug=False, sim_conf: SimConf | None = None) -> None:
     TASK_QUEUE = asyncio.Queue()
     LOCK = Lock()
 
-    CONF = load_config(load_state=True)
+    CONF = load_config(load_state=load_state)
     CONF.sim = sim_conf
     NOTIF = Notif(CONF.notify)
 

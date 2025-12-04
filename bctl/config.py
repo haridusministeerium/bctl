@@ -166,7 +166,7 @@ async def write_state(conf: Conf, displays: Sequence) -> None:
     # note we sort by 'name' field length to make sure definitions with
     # 'name' value set would be evaluated against first:
     offsets = sorted(
-        (((d.id, d.name), d.offset) for d in displays),
+        (((d.id, d.name), d.eoffset) for d in displays),
         key=lambda i: len(i[0][1]),
         reverse=True,
     )
