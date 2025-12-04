@@ -148,10 +148,11 @@ async def init_displays() -> None:
     LAST_INIT_TIME = unix_time_now()
 
 
-async def sync_displays() -> None:
-    if len(DISPLAYS) <= 1:
+async def sync_displays(opts = 0) -> None:
+    displays = list(filter(get_disp_filter(opts), DISPLAYS))
+    if len(displays) <= 1:
         return
-    values: List[int] = sorted([d.get_brightness() for d in DISPLAYS])
+    values: List[int] = sorted([d.get_brightness() for d in displays])
     #if same_values(values):
     if values[-1] - values[0] <= 1:  # allow for some flex
         return
@@ -171,15 +172,15 @@ async def sync_displays() -> None:
                     target = max(values)
                     break
                 case "internal":
-                    d = next((d for d in DISPLAYS if d.type == DisplayType.INTERNAL), None)
+                    d = next((d for d in displays if d.type == DisplayType.INTERNAL), None)
                     if d: break
                 case "external":
-                    d = next((d for d in DISPLAYS if d.type == DisplayType.EXTERNAL), None)
+                    d = next((d for d in displays if d.type == DisplayType.EXTERNAL), None)
                     if d: break
                 case _:
                     prefix = "model:"
                     if s.startswith(prefix):
-                        d = next((d for d in DISPLAYS if d.name == s[len(prefix):]), None)
+                        d = next((d for d in displays if d.name == s[len(prefix):]), None)
                         if d: break
                     else:
                         raise FatalErr(f"misconfigured brightness sync strategy [{s}]")
@@ -193,7 +194,7 @@ async def sync_displays() -> None:
             return
 
     LOGGER.debug(f"syncing brightnesses at {target}%")
-    await TASK_QUEUE.put(["set", target])
+    await TASK_QUEUE.put(["set", opts, target])
 
 
 async def init_displays_sim(sim) -> None:
@@ -473,7 +474,7 @@ async def execute_tasks(tasks: List[list]) -> None:
     if not opts & Opts.NO_NOTIFY:
         await NOTIF.notify_change(brightnesses[0])  # TODO: shouldn't we consolidate the value?
     if CONF.sync_brightness and not opts & Opts.NO_SYNC:
-        await sync_displays()
+        await sync_displays(opts)
 
 
 async def process_q() -> NoReturn:
