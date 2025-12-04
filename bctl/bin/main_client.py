@@ -23,20 +23,23 @@ def collect_per_disp_args(args: tuple[str, ...]) -> dict:
 
 
 def pack_opts(
-    notify: bool = True,
-    track: bool = True,
-    ignore_internal: bool = False,
-    ignore_external: bool = False,
+    no_notify: bool = False,
+    no_track: bool = False,
+    no_internal: bool = False,
+    no_external: bool = False,
+    no_sync: bool = False,
 ) -> int:
     opts = 0
-    if not notify:
+    if no_notify:
         opts |= Opts.NO_NOTIFY
-    if not track:
+    if no_track:
         opts |= Opts.NO_TRACK
-    if ignore_internal:
+    if no_internal:
         opts |= Opts.IGNORE_INTERNAL
-    if ignore_external:
+    if no_external:
         opts |= Opts.IGNORE_EXTERNAL
+    if no_sync:
+        opts |= Opts.NO_SYNC
     return opts
 
 
@@ -80,41 +83,68 @@ def down(ctx, delta):
 
 @main.command
 @click.pass_obj
-@click.option("--notify/--no-notify", default=True)
-@click.option("--track/--no-track", default=True)
+@click.option("--no-notify", is_flag=True, help="do not send desktop notification")
+@click.option("--no-track", is_flag=True, help="do not store set brightness in state")
+@click.option("--no-external", is_flag=True, help="ingore external displays")
+@click.option("--no-internal", is_flag=True, help="ingore internal displays")
+@click.option("--no-sync", is_flag=True, help="skip brightness sync if enabled in config")
 @click.argument("delta", type=int)
-def delta(ctx, notify: bool, track: bool, delta):
+def delta(
+    ctx,
+    no_notify: bool,
+    no_track: bool,
+    no_external: bool,
+    no_internal: bool,
+    no_sync: bool,
+    delta: int,
+):
     """Change screens' brightness by given %
 
     :param ctx: context
-    :param notify: whether brightness change notification should be emitted
-    :param track: whether this change should be tracked in 'last_set_brightness'
+    :param no_notify: do not send desktop notification on brightness change
+    :param no_track: do not track this change in 'last_set_brightness'
+    :param no_external: ignore external displays
+    :param no_internal: ignore internal displays
+    :param no_sync: skip brightness sync if enabled in config; useful with other
+                    options that filter out some screens
     :param delta: % delta to change brightness down by
     """
-    opts = pack_opts(notify, track)
+    opts = pack_opts(
+        no_notify=no_notify,
+        no_track=no_track,
+        no_internal=no_internal,
+        no_external=no_external,
+        no_sync=no_sync,
+    )
     ctx.send_cmd(["delta", opts, delta])
 
 
 @main.command
 @click.pass_obj
-@click.option("--notify/--no-notify", default=True)
-@click.option("--track/--no-track", default=True)
-@click.option("--ignore-external", is_flag=True, help="ingore external displays")
-@click.option("--ignore-internal", is_flag=True, help="ingore internal displays")
+@click.option("--no-notify", is_flag=True, help="do not send desktop notification")
+@click.option("--no-track", is_flag=True, help="do not store set brightness in state")
+@click.option("--no-external", is_flag=True, help="ingore external displays")
+@click.option("--no-internal", is_flag=True, help="ingore internal displays")
+@click.option("--no-sync", is_flag=True, help="skip brightness sync if enabled in config")
 @click.argument("args", nargs=-1, type=str)
 def set(
     ctx,
-    notify: bool,
-    track: bool,
-    ignore_external: bool,
-    ignore_internal: bool,
+    no_notify: bool,
+    no_track: bool,
+    no_external: bool,
+    no_internal: bool,
+    no_sync: bool,
     args: tuple[str, ...],
 ):
     """Change screens' brightness to/by given %
 
     :param ctx: context
-    :param notify: whether brightness change notification should be emitted
-    :param track: whether this change should be tracked in 'last_set_brightness'
+    :param no_notify: do not send desktop notification on brightness change
+    :param no_track: do not track this change in 'last_set_brightness'
+    :param no_external: ignore external displays
+    :param no_internal: ignore internal displays
+    :param no_sync: skip brightness sync if enabled in config; useful with other
+                    options that filter out some screens
     :param value: % value to change brightness to/by
     """
     if not args:
@@ -122,10 +152,11 @@ def set(
     elif len(args) == 1:
         value = args[0]
         opts = pack_opts(
-            notify,
-            track,
-            ignore_internal=ignore_internal,
-            ignore_external=ignore_external,
+            no_notify=no_notify,
+            no_track=no_track,
+            no_internal=no_internal,
+            no_external=no_external,
+            no_sync=no_sync,
         )
 
         if value.isdigit():
@@ -138,7 +169,7 @@ def set(
         assert len(args) % 2 == 0, (
             "when setting multiple displays, then even # or args expected"
         )
-        # assert notify and track and not ignore_external and not ignore_internal, (
+        # assert not (no_notify or no_track or no_external or no_internal or no_sync), (
             # "when setting brightnesses per monitor, then additional options are non-op"
         # )
         ctx.send_cmd(["set_for_async", collect_per_disp_args(args)])
@@ -204,15 +235,15 @@ def getvcp(ctx, retry: int, sleep: float | int, args: tuple[str, ...]):
     "-i", "--individual", is_flag=True, help="retrieve brightness levels per screen"
 )
 @click.option("-r", "--raw", is_flag=True, help="retrieve raw brightness value")
-@click.option("--ignore-external", is_flag=True, help="ingore external displays")
-@click.option("--ignore-internal", is_flag=True, help="ingore internal displays")
+@click.option("--no-external", is_flag=True, help="ingore external displays")
+@click.option("--no-internal", is_flag=True, help="ingore internal displays")
 @click.option("--no-offset", is_flag=True, help="do NOT normalize brightness value for effective offset")
 def get(
     ctx,
     individual: bool,
     raw: bool,
-    ignore_external: bool,
-    ignore_internal: bool,
+    no_external: bool,
+    no_internal: bool,
     no_offset: bool,
 ):
     """Get screens' brightness (%)
@@ -223,7 +254,7 @@ def get(
         raise ValueError(
             "raw values only make sense per-display, i.e. --raw option requires --individual"
         )
-    opts = pack_opts(ignore_internal=ignore_internal, ignore_external=ignore_external)
+    opts = pack_opts(no_internal=no_internal, no_external=no_external)
 
     if individual:
         opts |= Opts.GET_INDIVIDUAL

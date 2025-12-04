@@ -15,7 +15,8 @@ class Opts(IntFlag):
     GET_INDIVIDUAL = 16
     GET_RAW = 32
     GET_NO_OFFSET_NORMALIZED = 64
-    # NEXT_OPT = 128
+    NO_SYNC = 128
+    # NEXT_OPT = 256
 
 
 def _runtime_path() -> str:

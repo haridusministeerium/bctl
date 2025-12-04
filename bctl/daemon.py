@@ -472,7 +472,7 @@ async def execute_tasks(tasks: List[list]) -> None:
         CONF.state.last_set_brightness = brightnesses[0]
     if not opts & Opts.NO_NOTIFY:
         await NOTIF.notify_change(brightnesses[0])  # TODO: shouldn't we consolidate the value?
-    if CONF.sync_brightness:
+    if CONF.sync_brightness and not opts & Opts.NO_SYNC:
         await sync_displays()
 
 
