@@ -29,7 +29,12 @@ class State(BaseModel):
     ver: int = -1
     last_set_brightness: int = -1  # value we've set all displays' brightnesses (roughly) to;
                                    # -1 if brightnesses differ or we haven't set brightness using bctl yet
-    offsets: List[tuple[tuple[str, str], int]] = []   # ((display.id, display.name), eoffset) mappings
+    offsets: List[tuple[str, str, int, int]] = []  # (display.id, display.name, offset, eoffset) mappings;
+                                                   # note storing & rehydrating eoffsets is only relevant
+                                                   # when sync_brightness=False and first change upon
+                                                   # service restart is delta(), not set(); as syncing
+                                                   # already invokes set(), then that'll apply the correct
+                                                   # eoffset
 
 
 class NotifyIconConf(BaseModel):
@@ -166,8 +171,8 @@ async def write_state(conf: Conf, displays: Sequence) -> None:
     # note we sort by 'name' field length to make sure definitions with
     # 'name' value set would be evaluated against first:
     offsets = sorted(
-        (((d.id, d.name), d.eoffset) for d in displays),
-        key=lambda i: len(i[0][1]),
+        ((d.id, d.name, d.offset, d.eoffset) for d in displays),
+        key=lambda i: len(i[1]),
         reverse=True,
     )
     data: State = State.model_validate(
