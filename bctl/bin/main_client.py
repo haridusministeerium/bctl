@@ -45,7 +45,7 @@ def pack_opts(
 
 @click.group
 @click.pass_context
-@click.option("--debug", is_flag=True, help="Enables logging at debug level")
+@click.option("--debug", is_flag=True, help="log at debug level")
 def main(ctx, debug: bool):
     """Client for sending messages to BCTLD"""
     ctx.obj = client.Client(debug=debug)
