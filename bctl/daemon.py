@@ -113,12 +113,12 @@ async def init_displays() -> None:
     if displays:
         futures: List[Task[None]] = [asyncio.create_task(d.init()) for d in displays]
         await wait_and_reraise(futures)
-        # hydrate the eoffsets from state:
+        # hydrate the eoffsets from state; note we ignore it if display offset
+        # has changed in configuration:
         for d in displays:
-            for o in CONF.state.offsets:
-                id, name = o[0]
-                if (name and d.name == name) or d.id == id:
-                    d.eoffset = o[1]
+            for id, name, offset, eoffset in CONF.state.offsets:
+                if d.offset == offset and ((name and d.name == name) or d.id == id):
+                    d.eoffset = eoffset
                     break
 
         enabled_rule = CONF.offset.enabled_if
