@@ -4,7 +4,7 @@ import shutil
 from asyncio import Task
 from collections.abc import Sequence
 from enum import IntFlag
-from .exceptions import FatalErr, CmdErr
+from bctl.exceptions import FatalErr, CmdErr
 
 
 class Opts(IntFlag):

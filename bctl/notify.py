@@ -1,6 +1,6 @@
 from dbus_next import Variant
 from desktop_notify.aio import Server as AioNotifServer
-from .config import NotifyConf, NotifyIconConf
+from bctl.config import NotifyConf, NotifyIconConf
 # from desktop_notify.glib import Server as SyncNotifSerer
 
 
