@@ -127,7 +127,7 @@ class Conf(BaseModel):
     sim: SimConf | None = None  # simulation config, will be set by sim client
     state_f_path: str = f"{RUNTIME_PATH}/bctld.state"  # state that should survive restarts are stored here
     state: State = State()  # do not set, will be read in from state_f_path
-    max_state_age_sec: int = 60  # only use persisted state if it's younger than this
+    max_state_age_sec: int = 60  # only use persisted state if it's younger than this; <= 0 to always use state regardless of its age
 
 
 def load_config(load_state: bool = False) -> Conf:
@@ -155,7 +155,8 @@ def _load_state(conf: Conf) -> State:
 
     t = s.timestamp
     v = s.ver
-    if unix_time_now() - t <= conf.max_state_age_sec and v == STATE_VER:
+    is_state_young_enough: bool = (unix_time_now() - t <= conf.max_state_age_sec) if conf.max_state_age_sec > 0 else True
+    if is_state_young_enough and v == STATE_VER:
         LOGGER.debug(f"hydrated state from disk: {s}")
         return s
     return State()
