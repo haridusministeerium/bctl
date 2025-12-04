@@ -122,7 +122,7 @@ class Conf(BaseModel):
     internal_display_ctl: InternalDisplayCtl = InternalDisplayCtl.RAW  # only used if main_display_ctl=ddcutil and we're a laptop
     raw_device_dir: str = "/sys/class/backlight"  # used if main_display_ctl=raw OR
                                                   # (main_display_ctl=ddcutil AND internal_display_ctl=raw AND we're a laptop)
-    fatal_exit_code: int = 100  # exit code signifying fatal exit that should not be retried;
+    fatal_exit_code: int = 100  # exit code signifying fatal exit that should not be retried/restarted;
                                 # you might want to use this value in systemd unit file w/ RestartPreventExitStatus config
     sim: SimConf | None = None  # simulation config, will be set by sim client
     state_f_path: str = f"{RUNTIME_PATH}/bctld.state"  # state that should survive restarts are stored here
@@ -132,8 +132,7 @@ class Conf(BaseModel):
 
 def load_config(load_state: bool = False) -> Conf:
     configs = [
-        _read_dict_from_file(c)
-        for c in sorted(glob.glob(_conf_path() + "/*.json"))
+        _read_dict_from_file(c) for c in sorted(glob.glob(_conf_path() + "/*.json"))
     ]
     # conf = py_.merge(Conf().dict(), *configs)
     conf = py_.merge({}, *configs)
@@ -163,20 +162,30 @@ def _load_state(conf: Conf) -> State:
 
 
 async def write_state(conf: Conf, displays: Sequence) -> None:
-    offsets = [((d.id, d.name), d.offset) for d in displays]
-    data: State = State.model_validate({
-        "timestamp": unix_time_now(),
-        "ver": STATE_VER,
-        "last_set_brightness": conf.state.last_set_brightness,
-        # note we sort by 'name' field length to make sure definitions with
-        # 'name' value set would be evaluated against first:
-        "offsets": sorted(offsets, key=lambda i: len(i[0][1]), reverse=True)
-    })
+    # note we sort by 'name' field length to make sure definitions with
+    # 'name' value set would be evaluated against first:
+    offsets = sorted(
+        (((d.id, d.name), d.offset) for d in displays),
+        key=lambda i: len(i[0][1]),
+        reverse=True,
+    )
+    data: State = State.model_validate(
+        {
+            "timestamp": unix_time_now(),
+            "ver": STATE_VER,
+            "last_set_brightness": conf.state.last_set_brightness,
+            "offsets": offsets,
+        }
+    )
 
     try:
         LOGGER.debug("storing state...")
         payload = json.dumps(
-            data.dict(), indent=2, sort_keys=True, separators=(",", ": "), ensure_ascii=False
+            data.dict(),
+            indent=2,
+            sort_keys=True,
+            separators=(",", ": "),
+            ensure_ascii=False,
         )
 
         async with aiof.open(conf.state_f_path, mode="w") as f:

@@ -50,8 +50,8 @@ from bctl.config import (
     InternalDisplayCtl,
     GetStrategy,
 )
-from .exceptions import ExitableErr, FatalErr, PayloadErr, CmdErr, RetriableException
-from .notify import Notif
+from bctl.exceptions import ExitableErr, FatalErr, PayloadErr, CmdErr, RetriableException
+from bctl.notify import Notif
 
 DISPLAYS: Sequence[Display] = []
 TASK_QUEUE: Queue[list]
@@ -78,12 +78,11 @@ async def init_displays() -> None:
         return await init_displays_sim(CONF.sim)
 
     LOGGER.debug("initing displays...")
-    ignore_internal: bool = CONF.ignore_internal_display
 
     displays: Sequence[Display]
     match CONF.main_display_ctl:
         case MainDisplayCtl.DDCUTIL:
-            displays = await get_ddcutil_displays(ignore_internal)
+            displays = await get_ddcutil_displays()
         case MainDisplayCtl.RAW:
             displays = await get_raw_displays()
         case MainDisplayCtl.BRIGHTNESSCTL:
@@ -91,17 +90,18 @@ async def init_displays() -> None:
         case MainDisplayCtl.BRILLO:
             displays = await get_brillo_displays()
 
-    if ignore_internal:
-        displays = list(filter(lambda d: d.type != DisplayType.INTERNAL, displays))
+    opts = Opts(0)
+    if CONF.ignore_internal_display:
+        opts |= Opts.IGNORE_INTERNAL
     if CONF.ignore_external_display:
-        displays = list(filter(lambda d: d.type != DisplayType.EXTERNAL, displays))
+        opts |= Opts.IGNORE_EXTERNAL
+    displays = list(filter(get_disp_filter(opts), displays))
 
-    ignored_displays = CONF.ignored_displays
-    if ignored_displays:
+    if CONF.ignored_displays:
         displays = list(
             filter(
-                lambda d: d.id not in ignored_displays
-                and d.name not in ignored_displays,
+                lambda d: d.id not in CONF.ignored_displays
+                and d.name not in CONF.ignored_displays,
                 displays,
             )
         )
@@ -120,19 +120,19 @@ async def init_displays() -> None:
                     d.eoffset = o[1]
                     break
 
-    DISPLAYS = displays
-    enabled_rule = CONF.offset.enabled_if
-    if enabled_rule and not eval(enabled_rule):
-        LOGGER.debug(f"[{enabled_rule}] evaluated false, disabling offsets...")
-        for d in DISPLAYS:
-            d.offset = 0
-            d.eoffset = 0
-    disabled_rule = CONF.offset.disabled_if
-    if disabled_rule and eval(disabled_rule):
-        LOGGER.debug(f"[{disabled_rule}] evaluated true, disabling offsets...")
-        for d in DISPLAYS:
-            d.offset = 0
-            d.eoffset = 0
+        enabled_rule = CONF.offset.enabled_if
+        if enabled_rule and not eval(enabled_rule):
+            LOGGER.debug(f"[{enabled_rule}] evaluated false, disabling offsets...")
+            for d in displays:
+                d.offset = 0
+                d.eoffset = 0
+        disabled_rule = CONF.offset.disabled_if
+        if disabled_rule and eval(disabled_rule):
+            LOGGER.debug(f"[{disabled_rule}] evaluated true, disabling offsets...")
+            for d in displays:
+                d.offset = 0
+                d.eoffset = 0
+        DISPLAYS = displays
 
     LOGGER.debug(
         f"...initialized {len(displays)} display{'' if len(displays) == 1 else 's'}"
@@ -152,7 +152,7 @@ async def sync_displays(opts = 0) -> None:
     displays = list(filter(get_disp_filter(opts), DISPLAYS))
     if len(displays) <= 1:
         return
-    values: List[int] = sorted([d.get_brightness() for d in displays])
+    values: List[int] = sorted(d.get_brightness() for d in displays)
     #if same_values(values):
     if values[-1] - values[0] <= 1:  # allow for some flex
         return
@@ -302,7 +302,7 @@ async def get_bctl_displays() -> List[BCTLDisplay]:
     ]  # exists() check to deal with dead symlinks
 
 
-async def get_ddcutil_displays(ignore_internal: bool) -> List[Display]:
+async def get_ddcutil_displays() -> List[Display]:
     bus_path_prefix = CONF.ddcutil_bus_path_prefix
     displays: List[Display] = []
     in_invalid_block = False
@@ -349,7 +349,7 @@ async def get_ddcutil_displays(ignore_internal: bool) -> List[Display]:
                 in_invalid_block = False
         elif line.startswith("Display "):
             d = DDCDisplay(line.strip(), CONF)
-        elif line == "Invalid display" and not ignore_internal:
+        elif line == "Invalid display" and not CONF.ignore_internal_display:
             # start processing one of the 'Invalid display' blocks:
             in_invalid_block = True
     if d:  # sanity
@@ -468,7 +468,7 @@ async def execute_tasks(tasks: List[list]) -> None:
         # return
     #}
 
-    brightnesses: List[int] = sorted([f.result() for f in futures])
+    brightnesses: List[int] = sorted(f.result() for f in futures)
     if not opts & Opts.NO_TRACK and (brightnesses[-1] - brightnesses[0]) <= 1:
         CONF.state.last_set_brightness = brightnesses[0]
     if not opts & Opts.NO_NOTIFY:
