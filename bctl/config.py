@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from pydash import py_
 from datetime import datetime
 from logging import Logger
-from bctl.common import RUNTIME_PATH
+from bctl.common import CACHE_PATH
 
 LOGGER: Logger = logging.getLogger(__name__)
 
@@ -130,7 +130,7 @@ class Conf(BaseModel):
     fatal_exit_code: int = 100  # exit code signifying fatal exit that should not be retried/restarted;
                                 # you might want to use this value in systemd unit file w/ RestartPreventExitStatus config
     sim: SimConf | None = None  # simulation config, will be set by sim client
-    state_f_path: str = f"{RUNTIME_PATH}/bctld.state"  # state that should survive restarts are stored here
+    state_f_path: str = f"{CACHE_PATH}/bctld.state"  # state that should survive restarts are stored here
     state: State = State()  # do not set, will be read in from state_f_path
     max_state_age_sec: int = 60  # only use persisted state if it's younger than this; <= 0 to always use state regardless of its age
 
