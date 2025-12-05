@@ -3,10 +3,11 @@ import logging
 import asyncio
 import aiofiles as aiof
 import aiofiles.os as aios
+import bisect
 from os import R_OK, W_OK
 from abc import abstractmethod, ABC
 from enum import StrEnum, auto
-from typing import TypeVar
+from typing import TypeVar, List
 from asyncio import Task
 from pathlib import Path
 from logging import Logger
@@ -42,7 +43,12 @@ class Display(ABC):
         self.offset: int = 0  # percent
         self.eoffset: int = 0  # effective offset, percent
 
-    def _init(self) -> None:
+    def _offset_conf_matches(self, id: str, name: str) -> bool:
+        if name:
+            return self.name == name
+        return self.id == id
+
+    def _init_offset(self) -> None:
         for crit, offset in self.conf.offset.offsets.items():
             match crit:
                 case "internal":
@@ -64,6 +70,35 @@ class Display(ABC):
                             break
                     else:
                         raise FatalErr(f"misconfigured offset criteria [{crit}]")
+
+        # hydrate eoffset config from state;
+        # has to be invoked _after_ we've resolved display offset above!
+        for i, oc in enumerate(self.conf.state.offsets):
+            id, name, offset, eoffset = oc
+            if self._offset_conf_matches(id, name):
+                if self.offset == offset:
+                    self.eoffset = eoffset
+                else:
+                    # if configured offset has changed, then stored eoffset
+                    # needs to be considered invalid:
+                    del self.conf.state.offsets[i]
+                return
+
+    def _store_eoffset(self, value: int) -> None:
+        self.eoffset = value
+
+        # update or add offset to state:
+        offsets: List[tuple[str, str, int, int]] = self.conf.state.offsets
+        for i, oc in enumerate(offsets):
+            if self._offset_conf_matches(oc[0], oc[1]):
+                offsets[i] = (oc[0], oc[1], self.offset, value)
+                return
+        # note we sort by 'name' field length to make sure definitions with
+        # 'name' value set would be evaluated against first:
+        bisect.insort(offsets, (self.id, self.name, self.offset, value), key=lambda x: -len(x[1]))
+
+    def _init(self) -> None:
+        self._init_offset()
 
         if self.raw_brightness < 0:
             raise FatalErr(f"[{self.id}] raw_brightness appears to be uninitialized: {self.raw_brightness}")
@@ -99,7 +134,7 @@ class Display(ABC):
                     target = max(0, orig_value + self.eoffset)
                 else:
                     target = min(100, value + self.offset)
-            self.eoffset = target - value
+            self._store_eoffset(target - value)
             # print(f"   -> target: {target}, eoffset: {self.eoffset}")
             value = target
 
