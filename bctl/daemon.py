@@ -289,10 +289,9 @@ async def get_bctl_displays() -> list[BCTLDisplay]:
 
 
 async def get_ddcutil_displays() -> list[Display]:
-    bus_path_prefix = CONF.ddcutil_bus_path_prefix
     displays: list[Display] = []
     in_invalid_block = False
-    d: DDCDisplay | None = None
+    d: list[str] = []
     out, err, code = await run_cmd(
         ["ddcutil", "--brief", "detect"], LOGGER, throw_on_err=False
     )
@@ -305,26 +304,15 @@ async def get_ddcutil_displays() -> list[Display]:
         )
 
     for line in out.splitlines():
-        if d:
-            if line.startswith("   I2C bus:"):
-                i = line.find(bus_path_prefix)
-                d.bus = line[len(bus_path_prefix) + i :]
-            elif line.startswith("   Monitor:"):
-                id = line.split()[1]
-                if id:
-                    d.id = id
-                displays.append(d)
-                d = None  # reset
-            elif not line:  # block end
-                raise FatalErr(
-                    f"could not finalize display [{d.id}] - [ddcutil --brief] output has likely changed"
-                )
+        if not line:
+            in_invalid_block = False
+            if d:
+                displays.append(DDCDisplay(d, CONF))
+                d = []  # reset
         elif in_invalid_block:  # try to detect laptop internal display
-            if not line:
-                in_invalid_block = False
             # note matching against "eDP" in "DRM connector" line is not infallible, see https://github.com/rockowitz/ddcutil/issues/547#issuecomment-3253325547
             # expected line will be something like "   DRM connector:    card0-eDP-1"
-            elif re.fullmatch(
+            if re.fullmatch(
                 r"\s+DRM connector:\s+[a-z0-9]+-eDP-\d+", line
             ):  # i.e. "is this a laptop display?"
                 match CONF.internal_display_ctl:
@@ -335,13 +323,13 @@ async def get_ddcutil_displays() -> list[Display]:
                     case InternalDisplayCtl.BRILLO:
                         displays.append(await resolve_single_internal_display_brillo())
                 in_invalid_block = False
-        elif line.startswith("Display "):
-            d = DDCDisplay(line.strip(), CONF)
+        elif d or line.startswith("Display "):
+            d.append(line.strip())
         elif line == "Invalid display" and not CONF.ignore_internal_display:
             # start processing one of the 'Invalid display' blocks:
             in_invalid_block = True
     if d:  # sanity
-        raise FatalErr(f"display [{d.id}] defined but not finalized")
+        raise FatalErr("ddc display block parsing intiated but not finalized")
     return displays
 
 

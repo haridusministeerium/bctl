@@ -41,7 +41,9 @@ class Display(ABC):
         self.offset: int = 0  # percent
         self.eoffset: int = 0  # effective offset, percent
         self.offset_state: list[int] = []  # [offset, eoffset], references the array in state
-        self.names: list[str] = []
+        self.names: list[str] = [self.id] + self.conf.aliases.get(self.id, [])
+        if not id:
+            raise FatalErr("display ID falsy")
 
     def _init_offset(self) -> None:
         for crit, offset in self.conf.offset.offsets.items():
@@ -82,7 +84,6 @@ class Display(ABC):
 
     # note this needs to be the very last init step!
     def _init(self) -> None:
-        self.names = [self.id] + self.conf.aliases.get(self.id, [])
         self._init_offset()
 
         if self.raw_brightness < 0:
@@ -93,7 +94,7 @@ class Display(ABC):
             raise FatalErr("max_brightness cannot be smaller than raw_brightness")
 
         self.logger.debug(
-            f"  -> initialized {self.type} display [{self.id}], offset {self.offset}"
+            f"  -> initialized {self.type} display, offset {self.offset}"
         )
 
     @abstractmethod
@@ -131,7 +132,7 @@ class Display(ABC):
 
         if value != self.raw_brightness:
             self.logger.debug(
-                f"setting display [{self.id}] brightness to {value} ({round(value / self.max_brightness * 100)}%)..."
+                f"setting brightness to {value} ({round(value / self.max_brightness * 100)}%)..."
             )
             await self._set_brightness(value)
             self.raw_brightness = value
@@ -141,7 +142,7 @@ class Display(ABC):
         return await self.set_brightness(self._get_brightness(False, False) + delta)
 
     def get_brightness(self, raw: bool = False, no_offset_normalized: bool = False) -> int:
-        self.logger.debug(f"getting display [{self.id}] brightness")
+        self.logger.debug("getting brightness")
         return self._get_brightness(raw, no_offset_normalized)
 
     def _get_brightness(self, raw: bool, no_offset_normalized: bool) -> int:
@@ -173,7 +174,7 @@ class SimulatedDisplay(Display):
         await asyncio.sleep(3)
         if self.sim.failmode == "i":
             raise ExitableErr(
-                f"error initializing [{self.id}]", exit_code=self.sim.exit_code
+                "error initializing", exit_code=self.sim.exit_code
             )
         self.raw_brightness = self.sim.initial_brightness
         self.max_brightness = 100
@@ -192,7 +193,15 @@ class SimulatedDisplay(Display):
 class DDCDisplay(Display):
     bus: str  # string representation of this display's i2c bus number
 
-    def __init__(self, id: str, conf: Conf) -> None:
+    def __init__(self, ddc_block: list[str], conf: Conf) -> None:
+        id = ""
+        for line in ddc_block:
+            if line.startswith("I2C bus:"):
+                i = line.find(conf.ddcutil_bus_path_prefix)
+                self.bus = line[len(conf.ddcutil_bus_path_prefix) + i :]
+            elif line.startswith("Monitor:"):
+                id = line.split()[1]
+
         super().__init__(id, DisplayType.EXTERNAL, BackendType.DDCUTIL, conf)
 
     async def init(self) -> None:
