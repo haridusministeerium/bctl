@@ -104,14 +104,6 @@ async def init_displays() -> None:
         opts |= Opts.IGNORE_EXTERNAL
     displays = list(filter(get_disp_filter(opts), displays))
 
-    if CONF.ignored_displays:
-        displays = list(
-            filter(
-                lambda d: d.id not in CONF.ignored_displays,
-                displays,
-            )
-        )
-
     if len(list(filter(lambda d: d.type == DisplayType.INTERNAL, displays))) > 1:
         # TODO: shouldn't this exit fatally?
         raise RuntimeError("more than 1 laptop/internal displays found")
@@ -119,6 +111,14 @@ async def init_displays() -> None:
     if displays:
         futures: list[Task[None]] = [asyncio.create_task(d.init()) for d in displays]
         await wait_and_reraise(futures)
+
+        if CONF.ignored_displays:
+            displays = list(
+                filter(
+                    lambda d: not any(x in d.names for x in CONF.ignored_displays),
+                    displays,
+                )
+            )
 
         enabled_rule = CONF.offset.enabled_if
         if enabled_rule and not eval(enabled_rule):
@@ -179,7 +179,7 @@ async def sync_displays(opts = 0) -> None:
                 case _:
                     prefix = "id:"
                     if s.startswith(prefix):
-                        d = next((d for d in displays if d.id == s[len(prefix):]), None)
+                        d = next((d for d in displays if s[len(prefix):] in d.names), None)
                         if d: break
                     else:
                         raise FatalErr(f"misconfigured brightness sync strategy [{s}]")
@@ -390,7 +390,7 @@ async def execute_tasks(tasks: list[list]) -> None:
             case ["set", target]:  # set brightness to a % value
                 delta = 0  # cancel all previous deltas
             # case ['setmon', display_id, value]:
-                # d = next((d for d in DISPLAYS if d.id == display_id), None)
+                # d = next((d for d in DISPLAYS if display_id in d.names), None)
                 # if d:
                     # futures.append(asyncio.create_task(d.set_brightness(value)))
             # TODO: perhaps it's safer to remove on_exhaustion from init calls and allow the daemon to crash?:
@@ -580,8 +580,8 @@ async def process_client_commands(err_event: Event) -> None:
                 async with LOCK:
                     payload = await r(
                         disp_op,
-                        lambda d: d.set_brightness(disp_to_brightness[d.id]),
-                        lambda d: d.id in disp_to_brightness,
+                        lambda d: d.set_brightness(next(disp_to_brightness[x] for x in d.names if x in disp_to_brightness)),
+                        lambda d: any(x in disp_to_brightness for x in d.names),
                     )
             case ["set_for_async", disp_to_brightness]:
                 # TODO: consider passing OnErrOpts.RUN_ON_LAST_TRY to retry opts; with that we might even change to retries=0
@@ -589,8 +589,8 @@ async def process_client_commands(err_event: Event) -> None:
                 async with LOCK:
                     await r(
                         display_op,
-                        lambda d: d.set_brightness(disp_to_brightness[d.id]),
-                        lambda d: d.id in disp_to_brightness,
+                        lambda d: d.set_brightness(next(disp_to_brightness[x] for x in d.names if x in disp_to_brightness)),
+                        lambda d: any(x in disp_to_brightness for x in d.names),
                     )
                     return
             case _:

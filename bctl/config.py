@@ -122,6 +122,7 @@ class Conf(BaseModel):
     ignored_displays: list[str] = []  # either [ddcutil --brief detect] cmd "Monitor:" value, or <device> in /sys/class/backlight/<device>
     ignore_internal_display: bool = False  # do not control internal (i.e. laptop) display if available
     ignore_external_display: bool = False  # do not control external display(s) if available
+    aliases: dict[str, list[str]] = {}  # aliases to display IDs
     main_display_ctl: MainDisplayCtl = MainDisplayCtl.DDCUTIL
     internal_display_ctl: InternalDisplayCtl = InternalDisplayCtl.RAW  # only used if main_display_ctl=ddcutil and we're a laptop
     raw_device_dir: str = "/sys/class/backlight"  # used if main_display_ctl=raw OR
