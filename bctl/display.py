@@ -3,11 +3,10 @@ import logging
 import asyncio
 import aiofiles as aiof
 import aiofiles.os as aios
-import bisect
 from os import R_OK, W_OK
 from abc import abstractmethod, ABC
 from enum import StrEnum, auto
-from typing import TypeVar, List
+from typing import TypeVar
 from asyncio import Task
 from pathlib import Path
 from logging import Logger
@@ -32,21 +31,16 @@ class BackendType(StrEnum):
 
 class Display(ABC):
     def __init__(self, id: str, dt: DisplayType, bt: BackendType, conf: Conf) -> None:
-        self.id: str = id
+        self.id: str = id  # for ddcutil detect, it's the 'Monitor:' value; for laptop display it's the <device> in /sys/class/backlight/<device>
         self.type: DisplayType = dt
         self.backend: BackendType = bt
         self.conf: Conf = conf
-        self.name: str = ""  # for ddcutil detect, it's the 'Monitor:' value; for laptop display it'll likely be empty
         self.raw_brightness: int = -1  # raw, i.e. potentially not a percentage
         self.max_brightness: int = -1
         self.logger: Logger = logging.getLogger(f"{type(self).__name__}.{self.id}")
         self.offset: int = 0  # percent
         self.eoffset: int = 0  # effective offset, percent
-
-    def _offset_conf_matches(self, id: str, name: str) -> bool:
-        if name:
-            return self.name == name
-        return self.id == id
+        self.offset_state: list[int] = []  # [offset, eoffset], references the array in state
 
     def _init_offset(self) -> None:
         for crit, offset in self.conf.offset.offsets.items():
@@ -63,9 +57,9 @@ class Display(ABC):
                     self.offset = offset
                     break
                 case _:
-                    prefix = "model:"
+                    prefix = "id:"
                     if crit.startswith(prefix):
-                        if crit[len(prefix):] == self.name:
+                        if crit[len(prefix):] == self.id:
                             self.offset = offset
                             break
                     else:
@@ -73,29 +67,17 @@ class Display(ABC):
 
         # hydrate eoffset config from state;
         # has to be invoked _after_ we've resolved display offset above!
-        for i, oc in enumerate(self.conf.state.offsets):
-            id, name, offset, eoffset = oc
-            if self._offset_conf_matches(id, name):
-                if self.offset == offset:
-                    self.eoffset = eoffset
-                else:
-                    # if configured offset has changed, then stored eoffset
-                    # needs to be considered invalid:
-                    del self.conf.state.offsets[i]
-                return
+        o_state: list[int] | None = self.conf.state.offsets.get(self.id, None)
+        if o_state:
+            if self.offset == o_state[0]:
+                self.eoffset = o_state[1]
+            elif self.offset == 0:
+                # if configured offset has changed, then stored eoffset
+                # needs to be considered invalid:
+                del self.conf.state.offsets[self.id]
 
-    def _store_eoffset(self, value: int) -> None:
-        self.eoffset = value
-
-        # update or add offset to state:
-        offsets: List[tuple[str, str, int, int]] = self.conf.state.offsets
-        for i, oc in enumerate(offsets):
-            if self._offset_conf_matches(oc[0], oc[1]):
-                offsets[i] = (oc[0], oc[1], self.offset, value)
-                return
-        # note we sort by 'name' field length to make sure definitions with
-        # 'name' value set would be evaluated against first:
-        bisect.insort(offsets, (self.id, self.name, self.offset, value), key=lambda x: -len(x[1]))
+        if self.offset != 0:
+             self.conf.state.offsets[self.id] = self.offset_state = [self.offset, self.eoffset]
 
     # note this needs to be the very last init step!
     def _init(self) -> None:
@@ -139,7 +121,7 @@ class Display(ABC):
                     target = max(0, orig_value + self.eoffset)
                 else:
                     target = min(100, value + self.offset)
-            self._store_eoffset(target - value)
+            self.eoffset = self.offset_state[1] = target - value
             # print(f"   -> target: {target}, eoffset: {self.eoffset}")
             value = target
 

@@ -2,7 +2,6 @@ import os
 import glob
 import json
 import logging
-from typing import List
 from enum import StrEnum, auto
 import aiofiles as aiof
 from pydantic import BaseModel
@@ -29,12 +28,12 @@ class State(BaseModel):
     ver: int = STATE_VER
     last_set_brightness: int = -1  # value we've set all displays' brightnesses (roughly) to;
                                    # -1 if brightnesses differ or we haven't set brightness using bctl yet
-    offsets: List[tuple[str, str, int, int]] = []  # (display.id, display.name, offset, eoffset) mappings;
-                                                   # note storing & rehydrating eoffsets is only relevant
-                                                   # when sync_brightness=False and first change upon
-                                                   # service restart is delta(), not set(); as syncing
-                                                   # already invokes set(), then that'll apply the correct
-                                                   # eoffset
+    offsets: dict[str, list[int]] = {}  # display.id->[offset, eoffset] mappings;
+                                        # note storing & rehydrating eoffsets is only relevant
+                                        # when sync_brightness=False and first change upon
+                                        # service restart is delta(), not set(); as syncing
+                                        # already invokes set(), then that'll apply the correct
+                                        # eoffset
 
 
 class NotifyIconConf(BaseModel):
@@ -62,7 +61,7 @@ class OffsetType(StrEnum):
 class OffsetConf(BaseModel):
     type: OffsetType = OffsetType.HARD
     offsets: dict[str, int] = {}  # criteria -> offset rules; accepted keys are "internal", "external", "any",
-                                  # model:<model> as in [ddcutil --brief detect] cmd "Monitor:" value
+                                  # id:<monitor> as in [ddcutil --brief detect] cmd "Monitor:" value
 
     enabled_if: str = ""  # global rule to disable all offsets if this expression does not evaluate true;
                           # will be eval()'d in init_displays(), dangerous!
@@ -108,13 +107,13 @@ class Conf(BaseModel):
     periodic_init_sec: int = 0  # periodically re-init/re-detect monitors; 0 to disable
     sync_brightness: bool = False  # keep all displays' brightnesses at same value/synchronized
     sync_strategy: list[str] = ["mean"]  # if displays' brightnesses differ and are synced, what value to sync them to; only active if sync_brightness=True;
-                                # first matched strategy is used, i.e. can define as ["model:AUS:PA278QV:L9GMQA215221", "internal", "mean"]
+                                # first matched strategy is used, i.e. can define as ["id:AUS:PA278QV:L9GMQA215221", "internal", "mean"]
                                 # - mean = set to arithmetic mean
                                 # - low = set to lowest
                                 # - high = set to highest
                                 # - internal = set to the internal screen value
                                 # - external = set to _a_ external screen value
-                                # - model:<model> = set to <model> screen value; <model> being [ddcutil --brief detect] cmd "Monitor:" value
+                                # - id:<id> = set to <id> screen value; <id> being [ddcutil --brief detect] cmd "Monitor:" value
     get_strategy: GetStrategy = GetStrategy.MEAN  # if displays' brightnesses differ and are queried (via get command), what single value to return to represent current brightness level;
     notify: NotifyConf = NotifyConf()
     offset: OffsetConf = OffsetConf()
@@ -139,7 +138,6 @@ def load_config(load_state: bool = False) -> Conf:
     configs = [
         _read_dict_from_file(c) for c in sorted(glob.glob(_conf_path() + "/*.json"))
     ]
-    # conf = py_.merge(Conf().dict(), *configs)
     conf = py_.merge({}, *configs)
     conf = Conf.model_validate(conf)
 
@@ -173,7 +171,7 @@ async def write_state(conf: Conf) -> None:
     try:
         LOGGER.debug("storing state...")
         payload = json.dumps(
-            conf.state.dict(),
+            conf.state.model_dump(),
             indent=2,
             sort_keys=True,
             separators=(",", ": "),
