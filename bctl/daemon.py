@@ -278,7 +278,7 @@ async def get_raw_displays() -> List[RawDisplay]:
 
 
 async def get_brillo_displays() -> List[BrilloDisplay]:
-    out, err, code = await run_cmd(["brillo", "-Ll"], throw_on_err=True, logger=LOGGER)
+    out, err, code = await run_cmd(["brillo", "-Ll"], LOGGER, throw_on_err=True)
     out = out.splitlines()
     assert len(out) > 0, "no backlight-capable devices found w/ brillo"
 
@@ -291,7 +291,7 @@ async def get_brillo_displays() -> List[BrilloDisplay]:
 
 async def get_bctl_displays() -> List[BCTLDisplay]:
     cmd = ["brightnessctl", "--list", "--machine-readable", "--class=backlight"]
-    out, err, code = await run_cmd(cmd, throw_on_err=True, logger=LOGGER)
+    out, err, code = await run_cmd(cmd, LOGGER, throw_on_err=True)
     out = out.splitlines()
     assert len(out) > 0, "no backlight-capable devices found w/ brightnessctl"
 
@@ -308,7 +308,7 @@ async def get_ddcutil_displays() -> List[Display]:
     in_invalid_block = False
     d: DDCDisplay | None = None
     out, err, code = await run_cmd(
-        ["ddcutil", "--brief", "detect"], throw_on_err=False, logger=LOGGER
+        ["ddcutil", "--brief", "detect"], LOGGER, throw_on_err=False
     )
     if code != 0:
         if err and "ddcutil requires module i2c" in err:

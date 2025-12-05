@@ -216,7 +216,7 @@ class DDCDisplay(Display):
             "--bus",
             self.bus,
         ]
-        out, err, code = await run_cmd(cmd, throw_on_err=True, logger=self.logger)
+        out, err, code = await run_cmd(cmd, self.logger, throw_on_err=True)
         out = out.split()
         assert len(out) == 5, f"{cmd} output unexpected: {out}"
         self.raw_brightness = int(out[-2])
@@ -233,8 +233,8 @@ class DDCDisplay(Display):
             + ["setvcp"]
             + args
             + ["--bus", self.bus],
+            self.logger,
             throw_on_err=True,
-            logger=self.logger,
         )
 
     async def _get_vcp_feature(self, args: list[str]) -> str:
@@ -244,8 +244,8 @@ class DDCDisplay(Display):
             + ["getvcp"]
             + args
             + ["--bus", self.bus],
+            self.logger,
             throw_on_err=True,
-            logger=self.logger,
         )
         return out
 
@@ -264,8 +264,8 @@ class BCTLDisplay(NonDDCDisplay):
     async def _set_brightness(self, value: int) -> None:
         await run_cmd(
             ["brightnessctl", "--quiet", "-d", self.id, "set", str(value)],
+            self.logger,
             throw_on_err=True,
-            logger=self.logger,
         )
 
 
@@ -286,16 +286,16 @@ class BrilloDisplay(NonDDCDisplay):
     async def _get_device_attr(self, attr: str) -> int:
         out, err, code = await run_cmd(
             ["brillo", "-s", self.id, f"-rlG{attr}"],
+            self.logger,
             throw_on_err=True,
-            logger=self.logger,
         )
         return int(out)
 
     async def _set_brightness(self, value: int) -> None:
         await run_cmd(
             ["brillo", "-s", self.id, "-rlS", str(value)],
+            self.logger,
             throw_on_err=True,
-            logger=self.logger,
         )
 
 
