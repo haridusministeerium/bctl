@@ -2,7 +2,7 @@ import os
 import glob
 import json
 import logging
-from typing import Sequence, List
+from typing import List
 from enum import StrEnum, auto
 import aiofiles as aiof
 from pydantic import BaseModel
@@ -167,20 +167,13 @@ def _load_state(conf: Conf) -> State:
     return State()
 
 
-async def write_state(conf: Conf, displays: Sequence) -> None:
-    # note we sort by 'name' field length to make sure definitions with
-    # 'name' value set would be evaluated against first:
-    offsets = sorted(
-        ((d.id, d.name, d.offset, d.eoffset) for d in displays),
-        key=lambda i: len(i[1]),
-        reverse=True,
-    )
+async def write_state(conf: Conf) -> None:
     data: State = State.model_validate(
         {
             "timestamp": unix_time_now(),
             "ver": STATE_VER,
             "last_set_brightness": conf.state.last_set_brightness,
-            "offsets": offsets,
+            "offsets": conf.state.offsets,
         }
     )
 

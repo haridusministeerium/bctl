@@ -69,6 +69,13 @@ def validate_ext_deps() -> None:
             assert_cmd_exist(dep)
 
 
+def nullify_offset(displays: Sequence[Display]) -> None:
+    for d in displays:
+        d.offset = 0
+        d.eoffset = 0
+    CONF.state.offsets = []  # note offsets in state need to be reset as well
+
+
 async def init_displays() -> None:
     global DISPLAYS
     global LAST_INIT_TIME
@@ -113,26 +120,15 @@ async def init_displays() -> None:
     if displays:
         futures: List[Task[None]] = [asyncio.create_task(d.init()) for d in displays]
         await wait_and_reraise(futures)
-        # hydrate the eoffsets from state; note we ignore it if display offset
-        # has changed in configuration:
-        for d in displays:
-            for id, name, offset, eoffset in CONF.state.offsets:
-                if d.offset == offset and ((name and d.name == name) or d.id == id):
-                    d.eoffset = eoffset
-                    break
 
         enabled_rule = CONF.offset.enabled_if
         if enabled_rule and not eval(enabled_rule):
             LOGGER.debug(f"[{enabled_rule}] evaluated false, disabling offsets...")
-            for d in displays:
-                d.offset = 0
-                d.eoffset = 0
+            nullify_offset(displays)
         disabled_rule = CONF.offset.disabled_if
         if disabled_rule and eval(disabled_rule):
             LOGGER.debug(f"[{disabled_rule}] evaluated true, disabling offsets...")
-            for d in displays:
-                d.offset = 0
-                d.eoffset = 0
+            nullify_offset(displays)
         DISPLAYS = displays
 
     LOGGER.debug(
@@ -631,7 +627,7 @@ async def terminate():
     await TASK_QUEUE.put(["kill"])
     # alternatively, ignore existing queue and terminate immediately:
     # try:
-        # await write_state(CONF, DISPLAYS)
+        # await write_state(CONF)
     # finally:
         # os._exit(0)
 
@@ -746,7 +742,7 @@ async def run() -> None:
             await NOTIF.notify_err(e)
         sys.exit(1)
     finally:
-        await write_state(CONF, DISPLAYS)
+        await write_state(CONF)
 
 
 # top-level err handler that's caught for stuff ran prior to task group.
