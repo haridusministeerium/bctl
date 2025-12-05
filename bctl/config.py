@@ -26,7 +26,7 @@ class SimConf(BaseModel):
 
 class State(BaseModel):
     timestamp: int = 0
-    ver: int = -1
+    ver: int = STATE_VER
     last_set_brightness: int = -1  # value we've set all displays' brightnesses (roughly) to;
                                    # -1 if brightnesses differ or we haven't set brightness using bctl yet
     offsets: List[tuple[str, str, int, int]] = []  # (display.id, display.name, offset, eoffset) mappings;
@@ -168,19 +168,12 @@ def _load_state(conf: Conf) -> State:
 
 
 async def write_state(conf: Conf) -> None:
-    data: State = State.model_validate(
-        {
-            "timestamp": unix_time_now(),
-            "ver": STATE_VER,
-            "last_set_brightness": conf.state.last_set_brightness,
-            "offsets": conf.state.offsets,
-        }
-    )
+    conf.state.timestamp = unix_time_now()
 
     try:
         LOGGER.debug("storing state...")
         payload = json.dumps(
-            data.dict(),
+            conf.state.dict(),
             indent=2,
             sort_keys=True,
             separators=(",", ": "),
