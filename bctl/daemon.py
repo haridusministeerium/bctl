@@ -159,8 +159,8 @@ async def sync_displays(opts = 0) -> None:
     target: int = CONF.state.last_set_brightness
     if target == -1:  # i.e. we haven't explicitly set it to anything yet
         d: Display | None = None
-        for s in CONF.sync_strategy:
-            match s:
+        for strat in CONF.sync_strategy:
+            match strat:
                 case "mean":
                     target = int(fmean(values))
                     break
@@ -178,11 +178,11 @@ async def sync_displays(opts = 0) -> None:
                     if d: break
                 case _:
                     prefix = "id:"
-                    if s.startswith(prefix):
-                        d = next((d for d in displays if s[len(prefix):] in d.names), None)
+                    if strat.startswith(prefix):
+                        d = next((d for d in displays if strat[len(prefix):] in d.names), None)
                         if d: break
                     else:
-                        raise FatalErr(f"misconfigured brightness sync strategy [{s}]")
+                        raise FatalErr(f"misconfigured brightness sync strategy [{strat}]")
 
         if d is not None:
             target = d.get_brightness()
@@ -191,8 +191,10 @@ async def sync_displays(opts = 0) -> None:
                 f"cannot sync brightnesses as no displays detected for sync strategy [{CONF.sync_strategy}]"
             )
             return
+        LOGGER.debug(f"syncing using [{strat}] strategy at {target}%...")
+    else:
+        LOGGER.debug(f"syncing using last-set-value at {target}%")
 
-    LOGGER.debug(f"syncing brightnesses at {target}%")
     await TASK_QUEUE.put(["set", opts, target])
 
 
@@ -489,6 +491,7 @@ def handle_failure_after_retries(e: Exception):
 
 async def process_client_commands(err_event: Event) -> None:
     init_displays_retry_handler = get_retry(2, 0.3, True)
+    init_displays_retry = partial(init_displays_retry_handler, init_displays)
 
     # this wrapper is so exceptions from serve_forever() callbacks (which are not
     # awaited on) get propagated up to our taskgroup.
@@ -529,7 +532,6 @@ async def process_client_commands(err_event: Event) -> None:
             return
         data = json.loads(data)
         LOGGER.debug(f"received task {data} from client")
-        init_displays_retry = partial(init_displays_retry_handler, init_displays)
         payload = [1]
         match data:
             case ["get", opts]:
