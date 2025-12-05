@@ -513,14 +513,18 @@ async def process_client_commands(err_event: Event) -> None:
             raise
 
     async def process_client_command(reader, writer):
+        async def _close_socket():
+            # self.logger.debug("closing the connection")
+            writer.write_eof()
+            writer.close()
+            await writer.wait_closed()
+
         async def _send_response(payload: list):
             response = json.dumps(payload, separators=(",", ":"))
             LOGGER.debug(f"responding: {response}")
             writer.write(response.encode())
             await writer.drain()
-            writer.write_eof()
-            writer.close()
-            await writer.wait_closed()
+            await _close_socket()
 
         async def disp_op[T](
             op: Callable[[Display], Coroutine[Any, Any, T]],
@@ -554,7 +558,6 @@ async def process_client_commands(err_event: Event) -> None:
                         lambda d: d._set_vcp_feature(*params),
                         lambda d: d.backend == BackendType.DDCUTIL,
                     )
-
             case ["getvcp", retry, sleep, *params]:
                 r = get_retry(
                     retry, sleep, handle_failure_after_retries, init_displays_retry
@@ -592,10 +595,12 @@ async def process_client_commands(err_event: Event) -> None:
                         lambda d: d.set_brightness(next(disp_to_brightness[x] for x in d.names if x in disp_to_brightness)),
                         lambda d: any(x in disp_to_brightness for x in d.names),
                     )
+                    await _close_socket()
                     return
             case _:
                 LOGGER.debug("placing task in queue...")
                 await TASK_QUEUE.put(data)
+                await _close_socket()
                 return
         await _send_response(payload)
 
