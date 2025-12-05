@@ -12,7 +12,7 @@ def collect_per_disp_args(args: tuple[str, ...]) -> dict:
     # params = []
     for i, item in enumerate(args):
         if i % 2 == 0:
-            assert item, "display name must be given"
+            assert item, "display ID must be given"
             d = item
         else:
             assert item.isdigit(), "display brightness must be a digit"
