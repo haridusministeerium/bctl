@@ -82,7 +82,7 @@ async def init_displays() -> None:
     DISPLAYS = []  # immediately reset old state
 
     if CONF.sim:
-        return await init_displays_sim(CONF.sim)
+        return await init_displays_sim()
 
     LOGGER.debug("initing displays...")
 
@@ -197,10 +197,10 @@ async def sync_displays(opts = 0) -> None:
     await TASK_QUEUE.put(["set", opts, target])
 
 
-async def init_displays_sim(sim) -> None:
+async def init_displays_sim() -> None:
     global DISPLAYS
 
-    ndisplays: int = sim.ndisplays
+    ndisplays: int = CONF.sim.ndisplays
 
     LOGGER.debug(f"initing {ndisplays} simulated displays...")
     displays: List[SimulatedDisplay] = [
@@ -208,7 +208,7 @@ async def init_displays_sim(sim) -> None:
     ]
 
     futures: List[Task[None]] = [
-        asyncio.create_task(d.init(sim.initial_brightness)) for d in displays
+        asyncio.create_task(d.init()) for d in displays
     ]
     await wait_and_reraise(futures)
 
