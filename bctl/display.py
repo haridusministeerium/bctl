@@ -97,6 +97,7 @@ class Display(ABC):
         # 'name' value set would be evaluated against first:
         bisect.insort(offsets, (self.id, self.name, self.offset, value), key=lambda x: -len(x[1]))
 
+    # note this needs to be the very last init step!
     def _init(self) -> None:
         self._init_offset()
 
@@ -113,6 +114,10 @@ class Display(ABC):
 
     @abstractmethod
     async def _set_brightness(self, value: int) -> None:
+        pass
+
+    @abstractmethod
+    async def init(self) -> None:
         pass
 
     async def set_brightness(self, value: int) -> int:
@@ -180,13 +185,13 @@ class SimulatedDisplay(Display):
         super().__init__(id, DisplayType.SIM, BackendType.SIM, conf)
         self.sim = self.conf.sim
 
-    async def init(self, initial_brightness: int) -> None:
+    async def init(self) -> None:
         await asyncio.sleep(3)
         if self.sim.failmode == "i":
             raise ExitableErr(
                 f"error initializing [{self.id}]", exit_code=self.sim.exit_code
             )
-        self.raw_brightness = initial_brightness
+        self.raw_brightness = self.sim.initial_brightness
         self.max_brightness = 100
         super()._init()
 
