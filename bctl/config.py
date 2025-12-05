@@ -106,8 +106,8 @@ class Conf(BaseModel):
     udev_event_debounce_sec: float = 3.0  # both for debouncing & delay; have experienced missed ext. display detection w/ 1.0, but it's flimsy regardless
     periodic_init_sec: int = 0  # periodically re-init/re-detect monitors; 0 to disable
     sync_brightness: bool = False  # keep all displays' brightnesses at same value/synchronized
-    sync_strategy: list[str] = ["mean"]  # if displays' brightnesses differ and are synced, what value to sync them to; only active if sync_brightness=True;
-                                # first matched strategy is used, i.e. can define as ["id:AUS:PA278QV:L9GMQA215221", "internal", "mean"]
+    sync_strategy: tuple[str, ...] = ("mean",)  # if displays' brightnesses differ and are synced, what value to sync them to; only active if sync_brightness=True;
+                                # first matched strategy is applied, i.e. can define as ["id:AUS:PA278QV:L9GMQA215221", "internal", "mean"]
                                 # - mean = set to arithmetic mean
                                 # - low = set to lowest
                                 # - high = set to highest
@@ -119,10 +119,10 @@ class Conf(BaseModel):
     offset: OffsetConf = OffsetConf()
     msg_consumption_window_sec: float = 0.1  # can be set to 0 if no delay/window is required
     brightness_step: int = 5  # %
-    ignored_displays: list[str] = []  # either [ddcutil --brief detect] cmd "Monitor:" value, or <device> in /sys/class/backlight/<device>
+    ignored_displays: tuple[str, ...] = ()  # either [ddcutil --brief detect] cmd "Monitor:" value, or <device> in /sys/class/backlight/<device>
     ignore_internal_display: bool = False  # do not control internal (i.e. laptop) display if available
     ignore_external_display: bool = False  # do not control external display(s) if available
-    aliases: dict[str, list[str]] = {}  # aliases to display IDs
+    aliases: dict[str, tuple[str, ...]] = {}  # aliases to display IDs
     main_display_ctl: MainDisplayCtl = MainDisplayCtl.DDCUTIL
     internal_display_ctl: InternalDisplayCtl = InternalDisplayCtl.RAW  # only used if main_display_ctl=ddcutil and we're a laptop
     raw_device_dir: str = "/sys/class/backlight"  # used if main_display_ctl=raw OR

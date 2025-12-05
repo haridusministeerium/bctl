@@ -41,7 +41,7 @@ class Display(ABC):
         self.offset: int = 0  # percent
         self.eoffset: int = 0  # effective offset, percent
         self.offset_state: list[int] = []  # [offset, eoffset], references the array in state
-        self.names: list[str] = [self.id] + self.conf.aliases.get(self.id, [])
+        self.names: tuple[str, ...] = (self.id,) + self.conf.aliases.get(self.id, ())
         if not id:
             raise FatalErr("display ID falsy")
 
