@@ -41,6 +41,7 @@ class Display(ABC):
         self.offset: int = 0  # percent
         self.eoffset: int = 0  # effective offset, percent
         self.offset_state: list[int] = []  # [offset, eoffset], references the array in state
+        self.names: list[str] = []
 
     def _init_offset(self) -> None:
         for crit, offset in self.conf.offset.offsets.items():
@@ -59,7 +60,7 @@ class Display(ABC):
                 case _:
                     prefix = "id:"
                     if crit.startswith(prefix):
-                        if crit[len(prefix):] == self.id:
+                        if crit[len(prefix):] in self.names:
                             self.offset = offset
                             break
                     else:
@@ -81,6 +82,7 @@ class Display(ABC):
 
     # note this needs to be the very last init step!
     def _init(self) -> None:
+        self.names = [self.id] + self.conf.aliases.get(self.id, [])
         self._init_offset()
 
         if self.raw_brightness < 0:
