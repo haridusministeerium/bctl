@@ -4,6 +4,7 @@ import shutil
 from asyncio import Task
 from collections.abc import Sequence
 from enum import IntFlag
+from logging import Logger
 from bctl.exceptions import FatalErr, CmdErr
 
 
@@ -37,19 +38,19 @@ def same_values(s: Sequence) -> bool:
 
 
 async def run_cmd(
-    cmd: Sequence[str], throw_on_err=False, logger=None
+    cmd: Sequence[str], logger: Logger, throw_on_err=False,
 ) -> tuple[str, str, int | None]:
     if isinstance(cmd, str):
         cmd = cmd.split()
 
+    logger.debug(f"executing {cmd}...")
     proc = await asyncio.create_subprocess_exec(
         *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
 
     stdout, stderr = await proc.communicate()
     if proc.returncode != 0:
-        if logger:
-            logger.error(f"{cmd} returned w/ {proc.returncode}")
+        logger.error(f"{cmd} returned w/ {proc.returncode}")
         if throw_on_err:
             raise CmdErr(
                 f"{cmd} returned w/ {proc.returncode}", proc.returncode, stderr.decode()
