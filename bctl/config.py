@@ -60,8 +60,8 @@ class OffsetType(StrEnum):
 
 class OffsetConf(BaseModel):
     type: OffsetType = OffsetType.HARD
-    offsets: dict[str, int] = {}  # criteria -> offset rules; accepted keys are "internal", "external", "any",
-                                  # id:<monitor> as in [ddcutil --brief detect] cmd "Monitor:" value
+    offsets: dict[str, int] = {}  # criteria -> offset rules; accepted keys are "internal", "external", "any", "id:<id>";
+                                  # <id> being [ddcutil --brief detect] cmd "Monitor:" value (or alias)
 
     enabled_if: str = ""  # global rule to disable all offsets if this expression does not evaluate true;
                           # will be eval()'d in init_displays(), dangerous!
@@ -113,7 +113,7 @@ class Conf(BaseModel):
                                 # - high = set to highest
                                 # - internal = set to the internal screen value
                                 # - external = set to _a_ external screen value
-                                # - id:<id> = set to <id> screen value; <id> being [ddcutil --brief detect] cmd "Monitor:" value
+                                # - id:<id> = set to <id> screen value; <id> being [ddcutil --brief detect] cmd "Monitor:" value (or alias)
     get_strategy: GetStrategy = GetStrategy.MEAN  # if displays' brightnesses differ and are queried (via get command), what single value to return to represent current brightness level;
     notify: NotifyConf = NotifyConf()
     offset: OffsetConf = OffsetConf()
