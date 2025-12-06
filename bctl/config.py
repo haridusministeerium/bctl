@@ -1,14 +1,17 @@
 import os
 import glob
 import json
+import itertools
 import logging
 from enum import StrEnum, auto
+from collections.abc import Iterable
 import aiofiles as aiof
 from pydantic import BaseModel
 from pydash import py_
 from datetime import datetime
 from logging import Logger
 from bctl.common import CACHE_PATH
+from bctl.exceptions import FatalErr
 
 LOGGER: Logger = logging.getLogger(__name__)
 
@@ -144,6 +147,8 @@ def load_config(load_state: bool = False) -> Conf:
 
     if load_state:
         conf.state = _load_state(conf)
+    if find_dupes(conf.aliases.values()):
+        raise FatalErr("[aliases] definitions contain duplicates")
 
     # LOGGER.error(f"effective config: {conf}")
     return conf
@@ -164,6 +169,17 @@ def _load_state(conf: Conf) -> State:
         LOGGER.debug(f"hydrated state from disk: {s}")
         return s
     return State()
+
+
+def find_dupes[T](i: Iterable[Iterable[T]]) -> list[T]:
+    j = list(itertools.chain.from_iterable(i))
+    return list(set(j[::2]) & set(j[1::2]))
+
+
+# note this one doesn't flatten the input
+def intersect[T](iterable_of_iterables: Iterable[Iterable[T]]) -> set[T]:
+    iterator = iter(iterable_of_iterables)
+    return set(next(iterator)).intersection(*iterator)
 
 
 async def write_state(conf: Conf) -> None:
