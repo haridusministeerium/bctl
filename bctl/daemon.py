@@ -102,7 +102,16 @@ async def init_displays() -> None:
         opts |= Opts.IGNORE_INTERNAL
     if CONF.ignore_external_display:
         opts |= Opts.IGNORE_EXTERNAL
-    displays = list(filter(get_disp_filter(opts), displays))
+    if opts:
+        displays = list(filter(get_disp_filter(opts), displays))
+
+    if CONF.ignored_displays:
+        displays = list(
+            filter(
+                lambda d: not any(x in d.names for x in CONF.ignored_displays),
+                displays,
+            )
+        )
 
     if len(list(filter(lambda d: d.type == DisplayType.INTERNAL, displays))) > 1:
         # TODO: shouldn't this exit fatally?
@@ -111,14 +120,6 @@ async def init_displays() -> None:
     if displays:
         futures: list[Task[None]] = [asyncio.create_task(d.init()) for d in displays]
         await wait_and_reraise(futures)
-
-        if CONF.ignored_displays:
-            displays = list(
-                filter(
-                    lambda d: not any(x in d.names for x in CONF.ignored_displays),
-                    displays,
-                )
-            )
 
         enabled_rule = CONF.offset.enabled_if
         if enabled_rule and not eval(enabled_rule):
