@@ -187,14 +187,7 @@ async def write_state(conf: Conf) -> None:
 
     try:
         LOGGER.debug("storing state...")
-        payload = json.dumps(
-            conf.state.model_dump(),
-            indent=2,
-            sort_keys=True,
-            separators=(",", ": "),
-            ensure_ascii=False,
-        )
-
+        payload = conf.state.model_dump_json(indent=2)
         async with aiof.open(conf.state_f_path, mode="w") as f:
             await f.write(payload)
         LOGGER.debug("...state stored")
