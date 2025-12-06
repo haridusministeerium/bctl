@@ -1,4 +1,4 @@
-## 0.0.3 (unreleased)
+## 0.0.3 (2025-12-06)
 ---------------------
 
 - set & delta commands: add --track/--no-track options
