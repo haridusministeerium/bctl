@@ -94,7 +94,9 @@ class Display(ABC):
             raise FatalErr("max_brightness cannot be smaller than raw_brightness")
 
         self.logger.debug(
-            f"  -> initialized {self.type} display, offset {self.offset}"
+            f"  -> initialized {self.type} display: "
+            f"brightness {self._get_brightness(False, True)}, "
+            f"offset {self.offset}, eoffset {self.eoffset}"
         )
 
     @abstractmethod
@@ -191,7 +193,7 @@ class SimulatedDisplay(Display):
 
 # for ddcutil performance, see https://github.com/rockowitz/ddcutil/discussions/393
 class DDCDisplay(Display):
-    bus: str  # string representation of this display's i2c bus number
+    bus: str = ""  # string representation of this display's i2c bus number
 
     def __init__(self, ddc_block: list[str], conf: Conf) -> None:
         id = ""
