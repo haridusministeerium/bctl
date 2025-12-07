@@ -1,4 +1,4 @@
-## 0.0.4 (unreleased)
+## 0.0.4 (2025-12-07)
 ---------------------
 
 - automatically assign [display,laptop] aliases to
