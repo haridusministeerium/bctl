@@ -587,8 +587,8 @@ async def process_client_commands(err_event: Event) -> None:
                         lambda d: d.set_brightness(next(disp_to_brightness[x] for x in d.names if x in disp_to_brightness)),
                         lambda d: any(x in disp_to_brightness for x in d.names),
                     )
-                    await _close_socket()
-                    return
+                await _close_socket()
+                return
             case _:
                 LOGGER.debug("placing task in queue...")
                 await TASK_QUEUE.put(data)

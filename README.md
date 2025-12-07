@@ -74,7 +74,7 @@ lrwxrwxrwx 1 root root 0 Sep  7 09:44 amdgpu_bl0 -> ../../devices/pci0000:00/000
 $ echo 'ddcci 0x37' | sudo tee /sys/bus/i2c/devices/i2c-11/new_device
 ```
 
-- After (`ddcci11` external screen is now avail):
+- After state (`ddcci11` external screen is now avail):
 
 ```sh
 $ ls -l /sys/class/backlight
@@ -101,8 +101,8 @@ Meaning it's best to choose one of the options, not both.
 ### Daemon
 
 As mentioned earlier, a daemon process needs to be started that keeps track of
-the displays. Easiest way to do so would be utilizing your OS's process
-manager. An example of a systemd user service file (e.g.
+the displays and processes client commands. Easiest way to do so would be utilizing
+your OS's process manager. An example of a systemd user service file (e.g.
 `~/.config/systemd/user/bctld.service`) would be:
 
 ```
@@ -145,7 +145,7 @@ Some examples:
 - `bctl set +20` - bump brightness up by 20%
 - `bctl set -- -20` - bump brightness down by 20%
 - `bctl set 55` - set brightness to 55%
-- `bctl get` - returns current brightness level in %; see the `get_strategy` config
+- `bctl get` - return current brightness level in %; see the `get_strategy` config
                item in [config.py](./bctl/config.py) to set how differing
                brightnesses get consolidated into a single int
 - `bctl setvcp D6 01` - set vcp feature D6 to value 01 for all detected DDC displays;
@@ -153,8 +153,8 @@ Some examples:
 
 The daemon also registers signal handlers for `SIGUSR1` & `SIGUSR2`, so
 sending said signals to the daemon process allows bumping brightness up
-and down respectively; e.g.: `kill -s SIGUSR1 "$(pgrep -x bctld)"` or
-`killall -s SIGUSR1 bctld`
+or down by `brightness_step` respectively; e.g.: `kill -s SIGUSR1 "$(pgrep -x bctld)"`
+or `killall -s SIGUSR1 bctld`
 
 ### Socket
 
@@ -169,7 +169,7 @@ $ socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/bctl/bctld-ipc.sock <<< '["get",0]' | jq
 75
 ```
 
-Likewise, for setting brightness you might define a bash function similar to:
+Likewise, for setting brightness you might define a bash/zsh function similar to:
 
 ```sh
 # Sets the screens' brightness level

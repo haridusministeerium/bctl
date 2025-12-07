@@ -109,6 +109,7 @@ class Conf(BaseModel):
         "--skip-ddc-checks"
     ]
     ddcutil_gvcp_flags: list[str] = []  # flags passed to [ddcutil getvcp] commands
+                                        # you might also want to consider ddcutil configuration; see https://www.ddcutil.com/config_file/
     monitor_udev: bool = True  # monitor udev events for drm subsystem to detect ext. display (dis)connections
     udev_event_debounce_sec: float = 3.0  # both for debouncing & delay; have experienced missed ext. display detection w/ 1.0, but it's flimsy regardless
     periodic_init_sec: int = 0  # periodically re-init/re-detect monitors; 0 to disable

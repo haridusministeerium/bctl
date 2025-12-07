@@ -28,9 +28,9 @@ def _runtime_path() -> str:
     return dir_path
 
 
-RUNTIME_PATH = _runtime_path()
+RUNTIME_PATH: str = _runtime_path()
 SOCKET_PATH: str = f"{RUNTIME_PATH}/bctld-ipc.sock"
-CACHE_PATH = os.environ.get("XDG_CACHE_HOME", os.environ['HOME'] + "/.cache")
+CACHE_PATH: str = os.environ.get("XDG_CACHE_HOME", os.environ['HOME'] + "/.cache")
 
 
 # input sequence cannot be empty!
