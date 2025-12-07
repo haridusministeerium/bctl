@@ -218,6 +218,7 @@ defaults, but the most important ones you might want to be aware of or change ar
 | `internal_display_ctl` | str | raw | backend for controlling internal display |
 | `notify.icon.root_dir` | str | '' | notification icon directory |
 | `offset.offsets` | dict | {} | positive or negative brightness offset for displays matching given criteria |
+| `aliases` | dict | {} | extra name aliases to add to displays; laptop screen is automatically assigned aliases "laptop" and "internal" |
 | `fatal_exit_code` | int | 100 | error code daemon should exit with when restart shouldn't be attempted. you might want to use this value in systemd unit file w/ [`RestartPreventExitStatus`](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html#RestartPreventExitStatus=) config |
 
 #### `msg_consumption_window_sec`

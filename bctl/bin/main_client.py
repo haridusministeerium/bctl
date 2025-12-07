@@ -282,7 +282,7 @@ def init(ctx, retry: int, sleep: float | int):
 @main.command
 @click.pass_obj
 def sync(ctx):
-    """Synchronize screens' brightness levels.
+    """Synchronize screens' brightness levels, even if disabled in the config.
 
     :param ctx: context
     """

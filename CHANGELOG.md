@@ -1,7 +1,9 @@
 ## 0.0.4 (unreleased)
 ---------------------
 
-- Nothing changed yet.
+- automatically assign [display,laptop] aliases to
+  DisplayType.INTERNAL -- i.e. laptop -- screen
+- improve documentation in config.py
 
 
 ## 0.0.3 (2025-12-06)

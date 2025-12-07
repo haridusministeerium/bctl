@@ -35,13 +35,15 @@ class Display(ABC):
         self.type: DisplayType = dt
         self.backend: BackendType = bt
         self.conf: Conf = conf
-        self.raw_brightness: int = -1  # raw, i.e. potentially not a percentage
+        self.raw_brightness: int = -1  # raw, i.e. potentially not a percentage if max_brightness != 100
         self.max_brightness: int = -1
         self.logger: Logger = logging.getLogger(f"{type(self).__name__}.{self.id}")
         self.offset: int = 0  # percent
         self.eoffset: int = 0  # effective offset, percent
         self.offset_state: list[int] = []  # [offset, eoffset], references the array in state
-        self.names: tuple[str, ...] = (self.id,) + self.conf.aliases.get(self.id, ())
+        self.names: set[str] = set((self.id,) + self.conf.aliases.get(self.id, ()))
+        if self.type is DisplayType.INTERNAL:
+            self.names.update(['laptop', 'internal'])
         if not id:
             raise FatalErr("display ID falsy")
 
@@ -49,11 +51,11 @@ class Display(ABC):
         for crit, offset in self.conf.offset.offsets.items():
             match crit:
                 case "internal":
-                    if self.type == DisplayType.INTERNAL:
+                    if self.type is DisplayType.INTERNAL:
                         self.offset = offset
                         break
                 case "external":
-                    if self.type == DisplayType.EXTERNAL:
+                    if self.type is DisplayType.EXTERNAL:
                         self.offset = offset
                         break
                 case "any":
@@ -117,12 +119,12 @@ class Display(ABC):
 
         if self.offset != 0:
             if self.offset < 0:
-                if self.conf.offset.type == OffsetType.SOFT and orig_value > 100:
+                if self.conf.offset.type is OffsetType.SOFT and orig_value > 100:
                     target = min(100, orig_value + self.eoffset)
                 else:
                     target = max(0, value + self.offset)
             else:  # offset > 0
-                if self.conf.offset.type == OffsetType.SOFT and orig_value < 0:
+                if self.conf.offset.type is OffsetType.SOFT and orig_value < 0:
                     target = max(0, orig_value + self.eoffset)
                 else:
                     target = min(100, value + self.offset)
@@ -144,7 +146,7 @@ class Display(ABC):
         return await self.set_brightness(self._get_brightness(False, False) + delta)
 
     def get_brightness(self, raw: bool = False, no_offset_normalized: bool = False) -> int:
-        self.logger.debug("getting brightness")
+        self.logger.debug("getting brightness...")
         return self._get_brightness(raw, no_offset_normalized)
 
     def _get_brightness(self, raw: bool, no_offset_normalized: bool) -> int:

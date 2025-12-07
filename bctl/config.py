@@ -57,25 +57,29 @@ class NotifyConf(BaseModel):
 
 
 class OffsetType(StrEnum):
-    SOFT = auto()
-    HARD = auto()
+    SOFT = auto()  # allows offset screen to go over its boundary, e.g. brightness of
+                   # a screen w/ offset=10 can still be lowered all the way to 0%
+    HARD = auto()  # offset sets a hard limit; e.g. offset=20 means this screen's
+                   # brightness is not allowed to go below 20%
 
 
 class OffsetConf(BaseModel):
     type: OffsetType = OffsetType.HARD
     offsets: dict[str, int] = {}  # criteria -> offset rules; accepted keys are "internal", "external", "any", "id:<id>";
-                                  # <id> being [ddcutil --brief detect] cmd "Monitor:" value (or alias)
+                                  # <id> being [ddcutil --brief detect] cmd "Monitor:" value (or alias).
+                                  # offset of 20 means those displays' brightness will be 20% over the set limit;
+                                  # likewise -20 means brightness will be 20% lower than the set limit.
 
     enabled_if: str = ""  # global rule to disable all offsets if this expression does not evaluate true;
                           # will be eval()'d in init_displays(), dangerous!
                           # e.g.:
                           # - "__import__('socket').gethostname() in ['hostname1', 'hostname2']"
-                          #   or "os.uname().nodename in ['hostname1', 'hostname2']"
-                          # - "DISPLAYS"
+                          # - "os.uname().nodename in ['hostname1', 'hostname2']"
+                          # - "displays"
     disabled_if: str = ""  # global rule to disable all offsets if this expression evaluates true;
                            # will be eval()'d in init_displays(), dangerous!
                            # e.g.:
-                           # - "len(DISPLAYS) <= 1"
+                           # - "len(displays) <= 1"
 
 
 class MainDisplayCtl(StrEnum):
@@ -117,7 +121,8 @@ class Conf(BaseModel):
                                 # - internal = set to the internal screen value
                                 # - external = set to _a_ external screen value
                                 # - id:<id> = set to <id> screen value; <id> being [ddcutil --brief detect] cmd "Monitor:" value (or alias)
-    get_strategy: GetStrategy = GetStrategy.MEAN  # if displays' brightnesses differ and are queried (via get command), what single value to return to represent current brightness level;
+    get_strategy: GetStrategy = GetStrategy.MEAN  # if displays' brightnesses differ and are queried via get command,
+                                                  # what single value to return to represent current brightness level;
     notify: NotifyConf = NotifyConf()
     offset: OffsetConf = OffsetConf()
     msg_consumption_window_sec: float = 0.1  # can be set to 0 if no delay/window is required
@@ -125,7 +130,8 @@ class Conf(BaseModel):
     ignored_displays: tuple[str, ...] = ()  # either [ddcutil --brief detect] cmd "Monitor:" value, or <device> in /sys/class/backlight/<device>
     ignore_internal_display: bool = False  # do not control internal (i.e. laptop) display if available
     ignore_external_display: bool = False  # do not control external display(s) if available
-    aliases: dict[str, tuple[str, ...]] = {}  # aliases to display IDs
+    aliases: dict[str, tuple[str, ...]] = {}  # aliases to display IDs; cannot use "laptop" or "internal",
+                                              # as those are automatically assigned as aliases to laptop display
     main_display_ctl: MainDisplayCtl = MainDisplayCtl.DDCUTIL
     internal_display_ctl: InternalDisplayCtl = InternalDisplayCtl.RAW  # only used if main_display_ctl=ddcutil and we're a laptop
     raw_device_dir: str = "/sys/class/backlight"  # used if main_display_ctl=raw OR
@@ -147,8 +153,12 @@ def load_config(load_state: bool = False) -> Conf:
 
     if load_state:
         conf.state = _load_state(conf)
-    if find_dupes(conf.aliases.values()):
+    flat_aliases = list(itertools.chain.from_iterable(conf.aliases.values()))
+    if find_dupes(flat_aliases):
         raise FatalErr("[aliases] definitions contain duplicates")
+    reserved_aliases = ["internal", "laptop"]
+    if bool(set(reserved_aliases) & set(flat_aliases)):
+        raise FatalErr(f"[aliases] config cannot contain reserved values {reserved_aliases}")
 
     # LOGGER.error(f"effective config: {conf}")
     return conf
@@ -171,8 +181,8 @@ def _load_state(conf: Conf) -> State:
     return State()
 
 
-def find_dupes[T](i: Iterable[Iterable[T]]) -> list[T]:
-    j: list[T] = sorted(itertools.chain.from_iterable(i))
+def find_dupes[T](i: Iterable[T]) -> list[T]:
+    j = sorted(i)
     return list(set(j[::2]) & set(j[1::2]))
 
 

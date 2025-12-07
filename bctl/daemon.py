@@ -73,7 +73,7 @@ def nullify_offset(displays: Sequence[Display]) -> None:
     for d in displays:
         d.offset = 0
         d.eoffset = 0
-    CONF.state.offsets = {}  # note offsets in state need to be reset as well
+    #CONF.state.offsets = {}  # note offsets in state need to be reset as well
 
 
 async def init_displays() -> None:
@@ -113,7 +113,7 @@ async def init_displays() -> None:
             )
         )
 
-    if len(list(filter(lambda d: d.type == DisplayType.INTERNAL, displays))) > 1:
+    if len(list(filter(lambda d: d.type is DisplayType.INTERNAL, displays))) > 1:
         # TODO: shouldn't this exit fatally?
         raise RuntimeError("more than 1 laptop/internal displays found")
 
@@ -121,6 +121,7 @@ async def init_displays() -> None:
         futures: list[Task[None]] = [asyncio.create_task(d.init()) for d in displays]
         await wait_and_reraise(futures)
 
+        # note offset nullification needs to happen _after_ displays have been init()'d:
         enabled_rule = CONF.offset.enabled_if
         if enabled_rule and not eval(enabled_rule):
             LOGGER.debug(f"[{enabled_rule}] evaluated false, disabling offsets...")
@@ -172,10 +173,10 @@ async def sync_displays(opts = 0) -> None:
                     target = max(values)
                     break
                 case "internal":
-                    d = next((d for d in displays if d.type == DisplayType.INTERNAL), None)
+                    d = next((d for d in displays if d.type is DisplayType.INTERNAL), None)
                     if d: break
                 case "external":
-                    d = next((d for d in displays if d.type == DisplayType.EXTERNAL), None)
+                    d = next((d for d in displays if d.type is DisplayType.EXTERNAL), None)
                     if d: break
                 case _:
                     prefix = "id:"
@@ -228,13 +229,13 @@ async def resolve_single_internal_display_raw() -> RawDisplay:
 def _filter_by_backend_type(
     displays: list[TDisplay], bt: BackendType
 ) -> list[TDisplay]:
-    return list(filter(lambda d: d.backend == bt, displays))
+    return list(filter(lambda d: d.backend is bt, displays))
 
 
 def _filter_by_display_type(
     displays: list[TDisplay], dt: DisplayType
 ) -> list[TDisplay]:
-    return list(filter(lambda d: d.type == dt, displays))
+    return list(filter(lambda d: d.type is dt, displays))
 
 
 def _filter_internal_display(
@@ -353,8 +354,8 @@ async def display_op[T](
 
 def get_disp_filter(opts: Opts | int) -> Callable[[Display], bool]:
     return lambda d: not (
-        (opts & Opts.IGNORE_INTERNAL and d.type == DisplayType.INTERNAL)
-        or opts & Opts.IGNORE_EXTERNAL and d.type == DisplayType.EXTERNAL
+        (opts & Opts.IGNORE_INTERNAL and d.type is DisplayType.INTERNAL)
+        or opts & Opts.IGNORE_EXTERNAL and d.type is DisplayType.EXTERNAL
     )
 
 
@@ -547,7 +548,7 @@ async def process_client_commands(err_event: Event) -> None:
                     payload = await r(
                         disp_op,
                         lambda d: d._set_vcp_feature(*params),
-                        lambda d: d.backend == BackendType.DDCUTIL,
+                        lambda d: d.backend is BackendType.DDCUTIL,
                     )
             case ["getvcp", retry, sleep, *params]:
                 r = get_retry(
@@ -558,7 +559,7 @@ async def process_client_commands(err_event: Event) -> None:
                     payload = await r(
                         disp_op,
                         lambda d: d._get_vcp_feature(*params),
-                        lambda d: d.backend == BackendType.DDCUTIL,
+                        lambda d: d.backend is BackendType.DDCUTIL,
                         lambda futures, displays: [
                             0,
                             *[
