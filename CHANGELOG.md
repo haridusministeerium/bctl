@@ -1,7 +1,7 @@
 ## 0.0.5 (unreleased)
 ---------------------
 
-- Nothing changed yet.
+- config: survive pydantic model validation on State initialisation
 
 
 ## 0.0.4 (2025-12-07)

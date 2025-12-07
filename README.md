@@ -10,7 +10,7 @@ and a client to send commands to the daemon.
 
 > [!NOTE]
 > This will install the client & daemon executables, but it's user responsibility
-to launch the daemon process, covered below.
+to launch the daemon process, covered [below](#daemon).
 
 ## Features
 

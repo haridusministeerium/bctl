@@ -170,15 +170,18 @@ def _conf_path() -> str:
 
 
 def _load_state(conf: Conf) -> State:
-    s = State.model_validate_json(_read_json_bytes_from_file(conf.state_f_path))
+    try:
+        s = State.model_validate_json(_read_json_bytes_from_file(conf.state_f_path))
 
-    t = s.timestamp
-    v = s.ver
-    is_state_young_enough: bool = (unix_time_now() - t <= conf.max_state_age_sec) if conf.max_state_age_sec > 0 else True
-    if is_state_young_enough and v == STATE_VER:
-        LOGGER.debug(f"hydrated state from disk: {s}")
-        return s
-    return State()
+        t = s.timestamp
+        v = s.ver
+        is_state_young_enough: bool = (unix_time_now() - t <= conf.max_state_age_sec) if conf.max_state_age_sec > 0 else True
+        if is_state_young_enough and v == STATE_VER:
+            LOGGER.debug(f"hydrated state from disk: {s}")
+            return s
+        raise
+    except Exception:
+        return State()
 
 
 def find_dupes[T](i: Iterable[T]) -> list[T]:
