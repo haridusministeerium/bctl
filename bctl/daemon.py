@@ -300,6 +300,7 @@ async def get_ddcutil_displays() -> list[Display]:
         ["ddcutil", "--brief", "detect"], LOGGER, throw_on_err=False
     )
     if code != 0:
+        # err string can be found in https://github.com/rockowitz/ddcutil/blob/master/src/app_ddcutil/main.c
         if err and "ddcutil requires module i2c" in err:
             raise FatalErr("ddcutil requires i2c-dev kernel module to be loaded")
         LOGGER.error(err)

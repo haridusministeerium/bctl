@@ -128,7 +128,7 @@ class Conf(BaseModel):
     offset: OffsetConf = OffsetConf()
     msg_consumption_window_sec: float = 0.1  # can be set to 0 if no delay/window is required
     brightness_step: int = 5  # %
-    ignored_displays: tuple[str, ...] = ()  # either [ddcutil --brief detect] cmd "Monitor:" value, or <device> in /sys/class/backlight/<device>
+    ignored_displays: set[str] = set()  # either [ddcutil --brief detect] cmd "Monitor:" value, or <device> in /sys/class/backlight/<device>
     ignore_internal_display: bool = False  # do not control internal (i.e. laptop) display if available
     ignore_external_display: bool = False  # do not control external display(s) if available
     aliases: dict[str, tuple[str, ...]] = {}  # aliases to display IDs; cannot use "laptop" or "internal",
