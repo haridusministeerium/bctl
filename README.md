@@ -206,7 +206,8 @@ User configuration files are read from `$XDG_CONFIG_HOME/bctl/*.json`. The
 generated config will be the merger of all json files, with files ordered
 by the lexical order of their names.
 For full config list see the [config.py](./bctl/config.py) file that defines the
-defaults, but the most important ones you might want to be aware of or change are:
+defaults and contains their descriptions, but the most important ones you might
+want to be aware of or change are:
 
 | Config | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -277,6 +278,16 @@ Additionally you may opt out of udev monitoring altoghether (see [config.py](./b
 and rely on your own custom detection; in that case daemon can be asked to
 re-initialize its state by sending init command via the client: `$ bctl init`
 
+## TODO
+
+- offer [ddcutil-service](https://github.com/digitaltrails/ddcutil-service) as
+  an alternative backend for `main_display_ctl`; this one should really be
+  preferred, as it plays nice with any other brightness control tool using the
+  same service, meaning they're all aware of the brightness changes executed
+  via it. Potential issue is with our syncing and offsets that could pose a
+  challenge, especially if there's another service doing similar changes, which
+  might lead to endless loop of fighting over control. Guess bctl could be the
+  bigger man and not react to changes brought on by other parties.
 
 ## See also
 
