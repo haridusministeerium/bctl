@@ -2,6 +2,8 @@
 ---------------------
 
 - config: survive pydantic model validation on State initialisation
+- get: replace -i/--individual opts with -a/--all
+- get: support querying brightness for specific display(s)
 
 
 ## 0.0.4 (2025-12-07)

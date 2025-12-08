@@ -537,10 +537,14 @@ async def process_client_commands(err_event: Event) -> None:
         LOGGER.debug(f"received task {data} from client")
         payload = [1]
         match data:
-            case ["get", opts]:
+            case ["get"]:
                 async with LOCK:
                     with suppress(RetriableException):
-                        payload = [0, *get_brightness(opts)]
+                        payload = [0, *get_brightness(0, False)]
+            case ["get", opts, *displays]:
+                async with LOCK:
+                    with suppress(RetriableException):
+                        payload = [0, *get_brightness(opts, *displays)]
             case ["setvcp", retry, sleep, *params]:
                 r = get_retry(
                     retry, sleep, handle_failure_after_retries, init_displays_retry
@@ -618,14 +622,21 @@ async def terminate():
         # os._exit(0)
 
 
-# note raw values only make sense when asked for individual displays, as
+# note raw values only make sense when asked for specific or all displays, as
 # we can't really collate them into a single value as the scales potentially differ
-def get_brightness(opts) -> list[int | list[str | int]]:
-    displays = list(filter(get_disp_filter(opts), DISPLAYS))
+def get_brightness(opts, display_names) -> list[int | list[str | int]]:
+    displays = list(filter(get_disp_filter(opts), DISPLAYS)) if opts else DISPLAYS
+    if display_names:
+        displays = list(
+            filter(
+                lambda d: any(x in d.names for x in display_names),
+                displays,
+            )
+        )
 
     if not displays:
         return []
-    elif opts & Opts.GET_INDIVIDUAL:
+    elif opts & Opts.GET_ALL or display_names:
         # return [f'{d.id},{d.get_brightness(raw=opts & Opts.GET_RAW, no_offset_normalized=opts & Opts.GET_NO_OFFSET_NORMALIZED)}' for d in displays]
         return [
             [

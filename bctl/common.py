@@ -13,7 +13,7 @@ class Opts(IntFlag):
     NO_TRACK = 2
     IGNORE_EXTERNAL = 4
     IGNORE_INTERNAL = 8
-    GET_INDIVIDUAL = 16
+    GET_ALL = 16
     GET_RAW = 32
     GET_NO_OFFSET_NORMALIZED = 64
     NO_SYNC = 128

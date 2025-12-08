@@ -232,37 +232,45 @@ def getvcp(ctx, retry: int, sleep: float | int, args: tuple[str, ...]):
 @main.command
 @click.pass_obj
 @click.option(
-    "-i", "--individual", is_flag=True, help="retrieve brightness levels per screen"
+    "-a", "--all", is_flag=True, help="retrieve brightness levels for all screens"
 )
 @click.option("-r", "--raw", is_flag=True, help="retrieve raw brightness value")
 @click.option("--no-external", is_flag=True, help="ingore external displays")
 @click.option("--no-internal", is_flag=True, help="ingore internal displays")
 @click.option("--no-offset", is_flag=True, help="do NOT normalize brightness value for effective offset")
+@click.argument("displays", nargs=-1, type=str)
 def get(
     ctx,
-    individual: bool,
+    all: bool,
     raw: bool,
     no_external: bool,
     no_internal: bool,
     no_offset: bool,
+    displays: tuple[str, ...]
 ):
     """Get screens' brightness (%)
 
     :param ctx: context
     """
-    if raw and not individual:
+    if raw and not (all or displays):
         raise ValueError(
-            "raw values only make sense per-display, i.e. --raw option requires --individual"
+            "raw values only make sense per-display, i.e. --raw option "
+            "requires --all OR querying brightness for specific displays"
         )
-    opts = pack_opts(no_internal=no_internal, no_external=no_external)
+    elif displays and (all or no_external or no_internal):
+        raise ValueError(
+            "{--all, --no-external, --no-internal} opts are mutually "
+            "exclusive to querying brightness for specific display(s)"
+        )
 
-    if individual:
-        opts |= Opts.GET_INDIVIDUAL
+    opts = pack_opts(no_internal=no_internal, no_external=no_external)
+    if all:
+        opts |= Opts.GET_ALL
     if raw:
         opts |= Opts.GET_RAW
     if no_offset:
         opts |= Opts.GET_NO_OFFSET_NORMALIZED
-    ctx.send_receive_cmd(["get", opts])
+    ctx.send_receive_cmd(["get", opts, displays])
 
 
 @main.command
