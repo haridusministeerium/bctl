@@ -30,7 +30,7 @@ def _runtime_path() -> str:
 
 RUNTIME_PATH: str = _runtime_path()
 SOCKET_PATH: str = f"{RUNTIME_PATH}/bctld-ipc.sock"
-CACHE_PATH: str = os.environ.get("XDG_CACHE_HOME", os.environ['HOME'] + "/.cache")
+CACHE_PATH: str = os.environ.get("XDG_CACHE_HOME", os.environ["HOME"] + "/.cache")
 
 
 # input sequence cannot be empty!
@@ -39,7 +39,9 @@ def same_values(s: Sequence) -> bool:
 
 
 async def run_cmd(
-    cmd: Sequence[str], logger: Logger, throw_on_err=False,
+    cmd: Sequence[str],
+    logger: Logger,
+    throw_on_err=False,
 ) -> tuple[str, str, int | None]:
     if isinstance(cmd, str):
         cmd = cmd.split()

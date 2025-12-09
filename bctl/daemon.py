@@ -50,7 +50,13 @@ from bctl.config import (
     InternalDisplayCtl,
     GetStrategy,
 )
-from bctl.exceptions import ExitableErr, FatalErr, PayloadErr, CmdErr, RetriableException
+from bctl.exceptions import (
+    ExitableErr,
+    FatalErr,
+    PayloadErr,
+    CmdErr,
+    RetriableException,
+)
 from bctl.notify import Notif
 
 DISPLAYS: Sequence[Display] = []
@@ -149,7 +155,7 @@ async def init_displays() -> None:
     LAST_INIT_TIME = unix_time_now()
 
 
-async def sync_displays(opts = 0) -> None:
+async def sync_displays(opts=0) -> None:
     displays = list(filter(get_disp_filter(opts), DISPLAYS)) if opts else DISPLAYS
     if len(displays) <= 1:
         return
@@ -184,7 +190,9 @@ async def sync_displays(opts = 0) -> None:
                         d = next((d for d in displays if strat[len(prefix):] in d.names), None)
                         if d: break
                     else:
-                        raise FatalErr(f"misconfigured brightness sync strategy [{strat}]")
+                        raise FatalErr(
+                            f"misconfigured brightness sync strategy [{strat}]"
+                        )
 
         if d is not None:
             target = d.get_brightness()
@@ -210,9 +218,7 @@ async def init_displays_sim() -> None:
         SimulatedDisplay(f"sim-{i}", CONF) for i in range(ndisplays)
     ]
 
-    futures: list[Task[None]] = [
-        asyncio.create_task(d.init()) for d in displays
-    ]
+    futures: list[Task[None]] = [asyncio.create_task(d.init()) for d in displays]
     await wait_and_reraise(futures)
 
     DISPLAYS = displays
@@ -356,7 +362,8 @@ async def display_op[T](
 def get_disp_filter(opts: Opts | int) -> Callable[[Display], bool]:
     return lambda d: not (
         (opts & Opts.IGNORE_INTERNAL and d.type is DisplayType.INTERNAL)
-        or opts & Opts.IGNORE_EXTERNAL and d.type is DisplayType.EXTERNAL
+        or opts & Opts.IGNORE_EXTERNAL
+        and d.type is DisplayType.EXTERNAL
     )
 
 
@@ -553,7 +560,8 @@ async def process_client_commands(err_event: Event) -> None:
                     payload = await r(
                         disp_op,
                         lambda d: d._set_vcp_feature(*params),
-                        lambda d: d.backend is BackendType.DDCUTIL and (any(x in d.names for x in displays) if displays else True),
+                        lambda d: d.backend is BackendType.DDCUTIL
+                        and (any(x in d.names for x in displays) if displays else True),
                     )
             case ["getvcp", retry, sleep, displays, *params]:
                 r = get_retry(
@@ -564,7 +572,8 @@ async def process_client_commands(err_event: Event) -> None:
                     payload = await r(
                         disp_op,
                         lambda d: d._get_vcp_feature(*params),
-                        lambda d: d.backend is BackendType.DDCUTIL and (any(x in d.names for x in displays) if displays else True),
+                        lambda d: d.backend is BackendType.DDCUTIL
+                        and (any(x in d.names for x in displays) if displays else True),
                         lambda futures, displays: [
                             0,
                             *[
@@ -580,7 +589,13 @@ async def process_client_commands(err_event: Event) -> None:
                 async with LOCK:
                     payload = await r(
                         disp_op,
-                        lambda d: d.set_brightness(next(disp_to_brightness[x] for x in d.names if x in disp_to_brightness)),
+                        lambda d: d.set_brightness(
+                            next(
+                                disp_to_brightness[x]
+                                for x in d.names
+                                if x in disp_to_brightness
+                            )
+                        ),
                         lambda d: any(x in disp_to_brightness for x in d.names),
                     )
             case ["set_for_async", disp_to_brightness]:
@@ -589,7 +604,13 @@ async def process_client_commands(err_event: Event) -> None:
                 async with LOCK:
                     await r(
                         display_op,
-                        lambda d: d.set_brightness(next(disp_to_brightness[x] for x in d.names if x in disp_to_brightness)),
+                        lambda d: d.set_brightness(
+                            next(
+                                disp_to_brightness[x]
+                                for x in d.names
+                                if x in disp_to_brightness
+                            )
+                        ),
                         lambda d: any(x in disp_to_brightness for x in d.names),
                     )
                 await _close_socket()

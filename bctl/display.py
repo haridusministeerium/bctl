@@ -43,7 +43,7 @@ class Display(ABC):
         self.offset_state: list[int] = []  # [offset, eoffset], references the array in state
         self.names: set[str] = set((self.id,) + self.conf.aliases.get(self.id, ()))
         if self.type is DisplayType.INTERNAL:
-            self.names.update(['laptop', 'internal'])
+            self.names.update(["laptop", "internal"])
         if not id:
             raise FatalErr("display ID falsy")
 
@@ -64,7 +64,7 @@ class Display(ABC):
                 case _:
                     prefix = "id:"
                     if crit.startswith(prefix):
-                        if crit[len(prefix):] in self.names:
+                        if crit[len(prefix) :] in self.names:
                             self.offset = offset
                             break
                     else:
@@ -82,16 +82,23 @@ class Display(ABC):
                 del self.conf.state.offsets[self.id]
 
         if self.offset != 0:
-             self.conf.state.offsets[self.id] = self.offset_state = [self.offset, self.eoffset]
+            self.conf.state.offsets[self.id] = self.offset_state = [
+                self.offset,
+                self.eoffset,
+            ]
 
     # note this needs to be the very last init step!
     def _init(self) -> None:
         self._init_offset()
 
         if self.raw_brightness < 0:
-            raise FatalErr(f"[{self.id}] raw_brightness appears to be uninitialized: {self.raw_brightness}")
+            raise FatalErr(
+                f"[{self.id}] raw_brightness appears to be uninitialized: {self.raw_brightness}"
+            )
         if self.max_brightness <= 0:
-            raise FatalErr(f"[{self.id}] max_brightness appears to be uninitialized: {self.max_brightness}")
+            raise FatalErr(
+                f"[{self.id}] max_brightness appears to be uninitialized: {self.max_brightness}"
+            )
         if self.max_brightness < self.raw_brightness:
             raise FatalErr("max_brightness cannot be smaller than raw_brightness")
 
@@ -145,7 +152,9 @@ class Display(ABC):
     async def adjust_brightness(self, delta: int) -> int:
         return await self.set_brightness(self._get_brightness(False, False) + delta)
 
-    def get_brightness(self, raw: bool = False, no_offset_normalized: bool = False) -> int:
+    def get_brightness(
+        self, raw: bool = False, no_offset_normalized: bool = False
+    ) -> int:
         self.logger.debug("getting brightness...")
         return self._get_brightness(raw, no_offset_normalized)
 
@@ -177,9 +186,7 @@ class SimulatedDisplay(Display):
     async def init(self) -> None:
         await asyncio.sleep(3)
         if self.sim.failmode == "i":
-            raise ExitableErr(
-                "error initializing", exit_code=self.sim.exit_code
-            )
+            raise ExitableErr("error initializing", exit_code=self.sim.exit_code)
         self.raw_brightness = self.sim.initial_brightness
         self.max_brightness = 100
         super()._init()

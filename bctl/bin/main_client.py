@@ -87,7 +87,9 @@ def down(ctx, delta):
 @click.option("--no-track", is_flag=True, help="do not store set brightness in state")
 @click.option("--no-external", is_flag=True, help="ingore external displays")
 @click.option("--no-internal", is_flag=True, help="ingore internal displays")
-@click.option("--no-sync", is_flag=True, help="skip brightness sync if enabled in config")
+@click.option(
+    "--no-sync", is_flag=True, help="skip brightness sync if enabled in config"
+)
 @click.argument("delta", type=int)
 def delta(
     ctx,
@@ -125,7 +127,9 @@ def delta(
 @click.option("--no-track", is_flag=True, help="do not store set brightness in state")
 @click.option("--no-external", is_flag=True, help="ingore external displays")
 @click.option("--no-internal", is_flag=True, help="ingore internal displays")
-@click.option("--no-sync", is_flag=True, help="skip brightness sync if enabled in config")
+@click.option(
+    "--no-sync", is_flag=True, help="skip brightness sync if enabled in config"
+)
 @click.argument("args", nargs=-1, type=str)
 def set(
     ctx,
@@ -181,9 +185,11 @@ def set(
 @click.option(
     "-s", "--sleep", default=0.5, help="how many seconds to sleep between retries"
 )
-@click.option('--display', '-d', multiple=True, type=str)
+@click.option("--display", "-d", multiple=True, type=str)
 @click.argument("args", nargs=-1, type=str)
-def setvcp(ctx, retry: int, sleep: float | int, display: tuple[str, ...], args: tuple[str, ...]):
+def setvcp(
+    ctx, retry: int, sleep: float | int, display: tuple[str, ...], args: tuple[str, ...]
+):
     """Set VCP feature value(s) for all detected DDC displays
 
     :param ctx: context
@@ -220,9 +226,11 @@ def set_for(ctx, retry: int, sleep: float | int, args: tuple[str, ...]):
 @click.option(
     "-s", "--sleep", default=0.5, help="how many seconds to sleep between retries"
 )
-@click.option('--display', '-d', multiple=True, type=str)
+@click.option("--display", "-d", multiple=True, type=str)
 @click.argument("args", nargs=-1, type=str)
-def getvcp(ctx, retry: int, sleep: float | int, display: tuple[str, ...], args: tuple[str, ...]):
+def getvcp(
+    ctx, retry: int, sleep: float | int, display: tuple[str, ...], args: tuple[str, ...]
+):
     """Get VCP feature value(s) for all detected DDC displays
 
     :param ctx: context
@@ -239,7 +247,11 @@ def getvcp(ctx, retry: int, sleep: float | int, display: tuple[str, ...], args: 
 @click.option("-r", "--raw", is_flag=True, help="retrieve raw brightness value")
 @click.option("--no-external", is_flag=True, help="ingore external displays")
 @click.option("--no-internal", is_flag=True, help="ingore internal displays")
-@click.option("--no-offset", is_flag=True, help="do NOT normalize brightness value for effective offset")
+@click.option(
+    "--no-offset",
+    is_flag=True,
+    help="do NOT normalize brightness value for effective offset",
+)
 @click.argument("displays", nargs=-1, type=str)
 def get(
     ctx,
@@ -248,7 +260,7 @@ def get(
     no_external: bool,
     no_internal: bool,
     no_offset: bool,
-    displays: tuple[str, ...]
+    displays: tuple[str, ...],
 ):
     """Get screens' brightness (%)
 

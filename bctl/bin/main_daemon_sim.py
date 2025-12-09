@@ -7,7 +7,9 @@ from bctl.config import SimConf
 
 @click.command
 @click.option("--debug", is_flag=True, help="log at debug level")
-@click.option("--state/--no-state", default=True, help="whether persisted state should be loaded")
+@click.option(
+    "--state/--no-state", default=True, help="whether persisted state should be loaded"
+)
 @click.option("-n", "--number", default=3, help="Number of simulated displays")
 @click.option(
     "-w",

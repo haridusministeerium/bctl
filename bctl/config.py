@@ -159,7 +159,9 @@ def load_config(load_state: bool = False) -> Conf:
         raise FatalErr("[aliases] definitions contain duplicates")
     reserved_aliases = ["internal", "laptop"]
     if bool(set(reserved_aliases) & set(flat_aliases)):
-        raise FatalErr(f"[aliases] config cannot contain reserved values {reserved_aliases}")
+        raise FatalErr(
+            f"[aliases] config cannot contain reserved values {reserved_aliases}"
+        )
 
     # LOGGER.error(f"effective config: {conf}")
     return conf
@@ -176,7 +178,11 @@ def _load_state(conf: Conf) -> State:
 
         t = s.timestamp
         v = s.ver
-        is_state_young_enough: bool = (unix_time_now() - t <= conf.max_state_age_sec) if conf.max_state_age_sec > 0 else True
+        is_state_young_enough: bool = (
+            (unix_time_now() - t <= conf.max_state_age_sec)
+            if conf.max_state_age_sec > 0
+            else True
+        )
         if is_state_young_enough and v == STATE_VER:
             LOGGER.debug(f"hydrated state from disk: {s}")
             return s
