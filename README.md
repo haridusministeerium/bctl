@@ -290,6 +290,7 @@ re-initialize its state by sending init command via the client: `$ bctl init`
   challenge, especially if there's another service doing similar changes, which
   might lead to endless loop of fighting over control. Guess bctl could be the
   bigger man and not react to changes brought on by other parties.
+  note on this to-be backend our own udev monitor should be switched off.
 
 ## See also
 

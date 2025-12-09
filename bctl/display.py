@@ -45,7 +45,7 @@ class Display(ABC):
         if self.type is DisplayType.INTERNAL:
             self.names.update(["laptop", "internal"])
         if not id:
-            raise FatalErr("display ID falsy")
+            raise FatalErr(f"{self.type} {self.backend} ID falsy")
 
     def _init_offset(self) -> None:
         for crit, offset in self.conf.offset.offsets.items():

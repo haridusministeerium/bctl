@@ -169,7 +169,7 @@ async def sync_displays(opts=0) -> None:
         for strat in CONF.sync_strategy:
             match strat:
                 case "mean":
-                    target = int(fmean(values))
+                    target = round(fmean(values))
                     break
                 case "low":
                     target = min(values)
@@ -455,6 +455,10 @@ async def execute_tasks(tasks: list[list]) -> None:
         # return
     #}
 
+    await post_set(futures, opts)
+
+
+async def post_set(futures: Task[int], opts) -> None:
     brightnesses: list[int] = sorted(f.result() for f in futures)
     if not opts & Opts.NO_TRACK and (brightnesses[-1] - brightnesses[0]) <= 1:
         CONF.state.last_set_brightness = brightnesses[0]
@@ -581,7 +585,7 @@ async def process_client_commands(err_event: Event) -> None:
                             ],
                         ],
                     )
-            case ["set_for", retry, sleep, disp_to_brightness]:
+            case ["set_for_sync", retry, sleep, disp_to_brightness]:
                 r = get_retry(
                     retry, sleep, handle_failure_after_retries, init_displays_retry
                 )
@@ -596,7 +600,32 @@ async def process_client_commands(err_event: Event) -> None:
                             )
                         ),
                         lambda d: any(x in disp_to_brightness for x in d.names),
+                        lambda futures, displays: [
+                            0,
+                            *[
+                                [displays[i].id, f.result()]
+                                for i, f in enumerate(futures)
+                            ],
+                        ],
                     )
+            case ["set_sync", retry, sleep, opts, value]:
+                r = get_retry(
+                    retry, sleep, on_exception=init_displays_retry
+                )
+                async with LOCK:
+                    with suppress(RetriableException):
+                        futures, displays = await r(
+                            display_op,
+                            lambda d: d.set_brightness(value),
+                        )
+                        await post_set(futures, opts)
+                        payload = [
+                            0,
+                            *[
+                                [d.id, d.get_brightness(no_offset_normalized=opts & Opts.GET_NO_OFFSET_NORMALIZED)] for d in displays
+                            ],
+                        ]
+
             case ["set_for_async", disp_to_brightness]:
                 # TODO: consider passing OnErrOpts.RUN_ON_LAST_TRY to retry opts; with that we might even change to retries=0
                 r = get_retry(1, 0.5, True, init_displays_retry)
@@ -686,7 +715,7 @@ def get_brightness(opts, display_names) -> tuple[int] | list[tuple[str, int]]:
     #}
         match CONF.get_strategy:
             case GetStrategy.MEAN:
-                val = int(fmean(values))
+                val = round(fmean(values))
             case GetStrategy.LOW:
                 val = min(values)
             case GetStrategy.HIGH:

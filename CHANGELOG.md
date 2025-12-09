@@ -5,6 +5,13 @@
   -d option to set/get vcp features for specific display(s) as opposed
    to all displays, as continues being the default
 
+- split set_for into set_for_sync & set_for_sync_all
+  - note these are the commands triggered by set-sync (old name set-for) client command
+    - set_for_sync_all makes set-sync client command to accept just a single
+      int, which will then set all displays' brightnesses to that value;
+      tracking, sync & notifications work as with "set"
+    - set_for_sync acts as previous set-for command, i.e. accepts [diplay value] pairs
+
 
 ## 0.0.5 (2025-12-08)
 ---------------------

@@ -7,16 +7,17 @@ import bctl.client as client
 from bctl.common import Opts
 
 
-def collect_per_disp_args(args: tuple[str, ...]) -> dict:
+def collect_per_disp_args(args: tuple[str, ...]) -> dict[str, int]:
     p = {}
     # params = []
     for i, item in enumerate(args):
         if i % 2 == 0:
-            assert item, "display ID must be given"
+            assert item, "display ID/alias must be given"
             d = item
         else:
             assert item.isdigit(), "display brightness must be a digit"
             v = int(item)
+            assert 0 <= v <= 100, "display brightness must be 0 <= value <= 100"
             # params.append([d, v])
             p[d] = v
     return p
@@ -200,24 +201,61 @@ def setvcp(
     ctx.send_receive_cmd(["setvcp", retry, sleep, display, args])
 
 
-@main.command("set-for")
+@main.command("set-sync")
 @click.pass_obj
 @click.option("-r", "--retry", default=0, help="how many times to retry operation")
 @click.option(
     "-s", "--sleep", default=0.5, help="how many seconds to sleep between retries"
 )
+@click.option("--no-notify", is_flag=True, help="do not send desktop notification")
+@click.option("--no-track", is_flag=True, help="do not store set brightness in state")
+@click.option(
+    "--no-sync", is_flag=True, help="skip brightness sync if enabled in config"
+)
+@click.option(
+    "--no-offset",
+    is_flag=True,
+    help="do NOT normalize brightness value for effective offset; only affects the response format",
+)
 @click.argument("args", nargs=-1, type=str)
-def set_for(ctx, retry: int, sleep: float | int, args: tuple[str, ...]):
-    """similar to multi-argument set(), but synchronized
+def set_sync(
+    ctx,
+    retry: int,
+    sleep: float | int,
+    no_notify: bool,
+    no_track: bool,
+    no_sync: bool,
+    no_offset: bool,
+    args: tuple[str, ...],
+):
+    """similar to multi-argument set(), but synchronized. think of it as set-get
 
     :param ctx: context
     :param value: % value to change brightness to/by
     """
-    assert len(args) >= 2, (
-        "minimum 2 args needed, read ddcutil manual on [set_for] command"
-    )
-    assert len(args) % 2 == 0, "even args required"
-    ctx.send_receive_cmd(["set_for", retry, sleep, collect_per_disp_args(args)])
+    if not args:
+        raise ValueError("params missing")
+    elif len(args) == 1:
+        v = args[0]
+        assert v.isdigit(), "display brightness must be a digit"
+        v = int(v)
+        assert 0 <= v <= 100, "display brightness must be 0 <= value <= 100"
+        opts = pack_opts(
+            no_notify=no_notify,
+            no_track=no_track,
+            no_sync=no_sync,
+        )
+        if no_offset:
+            opts |= Opts.GET_NO_OFFSET_NORMALIZED
+        ctx.send_receive_cmd(["set_sync", retry, sleep, opts, v])
+    else:
+        assert len(args) % 2 == 0, (
+            "when setting multiple displays, then even # or args expected"
+        )
+        # assert not (no_notify or no_track or no_sync or no_offset), (
+            # "when setting brightnesses per monitor, then additional options are non-op"
+        # )
+        ctx.send_receive_cmd(["set_for_sync", retry, sleep, collect_per_disp_args(args)])
 
 
 @main.command
