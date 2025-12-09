@@ -625,7 +625,6 @@ async def process_client_commands(err_event: Event) -> None:
                                 [d.id, d.get_brightness(no_offset_normalized=opts & Opts.GET_NO_OFFSET_NORMALIZED)] for d in displays
                             ],
                         ]
-
             case ["set_for_async", disp_to_brightness]:
                 # TODO: consider passing OnErrOpts.RUN_ON_LAST_TRY to retry opts; with that we might even change to retries=0
                 r = get_retry(1, 0.5, True, init_displays_retry)
