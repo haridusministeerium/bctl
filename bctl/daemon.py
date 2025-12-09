@@ -103,21 +103,20 @@ async def init_displays() -> None:
         case MainDisplayCtl.BRILLO:
             displays = await get_brillo_displays()
 
+    filters: list[Callable[[Display], bool]] = []
     opts = 0
     if CONF.ignore_internal_display:
         opts |= Opts.IGNORE_INTERNAL
     if CONF.ignore_external_display:
         opts |= Opts.IGNORE_EXTERNAL
     if opts:
-        displays = list(filter(get_disp_filter(opts), displays))
+        filters.append(get_disp_filter(opts))
 
     if CONF.ignored_displays:
-        displays = list(
-            filter(
-                lambda d: not any(x in d.names for x in CONF.ignored_displays),
-                displays,
-            )
-        )
+        filters.append(lambda d: not any(x in d.names for x in CONF.ignored_displays))
+
+    if filters:
+        displays = list(filter(lambda d: all(f(d) for f in filters), displays))
 
     if len(list(filter(lambda d: d.type is DisplayType.INTERNAL, displays))) > 1:
         # TODO: shouldn't this exit fatally?
@@ -149,7 +148,7 @@ async def init_displays() -> None:
     #       suppose only place where reset is required is if our get_brightness()
     #       returns the last_set_brightness if it's set, which in this case would
     #       become invalid. so it really depends on how last_set_brightness is used.
-    elif not same_values([d.get_brightness() for d in DISPLAYS]):
+    elif DISPLAYS and not same_values([d.get_brightness() for d in DISPLAYS]):
         CONF.state.last_set_brightness = -1  # reset, as potentially newly added display could have a different value
 
     LAST_INIT_TIME = unix_time_now()
@@ -645,28 +644,30 @@ async def terminate():
 
 # note raw values only make sense when asked for specific or all displays, as
 # we can't really collate them into a single value as the scales potentially differ
-def get_brightness(opts, display_names) -> tuple[int] | list[list[str | int]]:
-    displays = list(filter(get_disp_filter(opts), DISPLAYS)) if opts else DISPLAYS
+def get_brightness(opts, display_names) -> tuple[int] | list[tuple[str, int]]:
+    filters: list[Callable[[Display], bool]] = []
+    if opts:
+        filters.append(get_disp_filter(opts))
     if display_names:
-        displays = list(
-            filter(
-                lambda d: any(x in d.names for x in display_names),
-                displays,
-            )
-        )
+        filters.append(lambda d: any(x in d.names for x in display_names))
+
+    if filters:
+        displays = list(filter(lambda d: all(f(d) for f in filters), DISPLAYS))
+    else:
+        displays = DISPLAYS
 
     if not displays:
         return []
     elif opts & Opts.GET_ALL or display_names:
         # return [f'{d.id},{d.get_brightness(raw=opts & Opts.GET_RAW, no_offset_normalized=opts & Opts.GET_NO_OFFSET_NORMALIZED)}' for d in displays]
         return [
-            [
+            (
                 d.id,
                 d.get_brightness(
                     raw=opts & Opts.GET_RAW,
                     no_offset_normalized=opts & Opts.GET_NO_OFFSET_NORMALIZED,
                 ),
-            ]
+            )
             for d in displays
         ]
 
