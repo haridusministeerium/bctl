@@ -1,7 +1,9 @@
 ## 0.0.6 (unreleased)
 ---------------------
 
-- Nothing changed yet.
+- getvcp/setvcp: add -d option to specify display(s)
+  -d option to set/get vcp features for specific display(s) as opposed
+   to all displays, as continues being the default
 
 
 ## 0.0.5 (2025-12-08)

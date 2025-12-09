@@ -181,8 +181,9 @@ def set(
 @click.option(
     "-s", "--sleep", default=0.5, help="how many seconds to sleep between retries"
 )
+@click.option('--display', '-d', multiple=True, type=str)
 @click.argument("args", nargs=-1, type=str)
-def setvcp(ctx, retry: int, sleep: float | int, args: tuple[str, ...]):
+def setvcp(ctx, retry: int, sleep: float | int, display: tuple[str, ...], args: tuple[str, ...]):
     """Set VCP feature value(s) for all detected DDC displays
 
     :param ctx: context
@@ -190,7 +191,7 @@ def setvcp(ctx, retry: int, sleep: float | int, args: tuple[str, ...]):
     assert len(args) >= 2, (
         "minimum 2 args needed, read ddcutil manual on [setvcp] command"
     )
-    ctx.send_receive_cmd(["setvcp", retry, sleep, args])
+    ctx.send_receive_cmd(["setvcp", retry, sleep, display, args])
 
 
 @main.command("set-for")
@@ -201,7 +202,7 @@ def setvcp(ctx, retry: int, sleep: float | int, args: tuple[str, ...]):
 )
 @click.argument("args", nargs=-1, type=str)
 def set_for(ctx, retry: int, sleep: float | int, args: tuple[str, ...]):
-    """similar to multi version of set(), but synchronized
+    """similar to multi-argument set(), but synchronized
 
     :param ctx: context
     :param value: % value to change brightness to/by
@@ -219,14 +220,15 @@ def set_for(ctx, retry: int, sleep: float | int, args: tuple[str, ...]):
 @click.option(
     "-s", "--sleep", default=0.5, help="how many seconds to sleep between retries"
 )
+@click.option('--display', '-d', multiple=True, type=str)
 @click.argument("args", nargs=-1, type=str)
-def getvcp(ctx, retry: int, sleep: float | int, args: tuple[str, ...]):
+def getvcp(ctx, retry: int, sleep: float | int, display: tuple[str, ...], args: tuple[str, ...]):
     """Get VCP feature value(s) for all detected DDC displays
 
     :param ctx: context
     """
     assert args, "minimum 1 feature needed, read ddcutil manual on [getvcp] command"
-    ctx.send_receive_cmd(["getvcp", retry, sleep, args])
+    ctx.send_receive_cmd(["getvcp", retry, sleep, display, args])
 
 
 @main.command

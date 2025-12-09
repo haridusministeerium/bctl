@@ -506,6 +506,16 @@ async def process_client_commands(err_event: Event) -> None:
             err_event.set()
             raise
 
+    async def disp_op[T](
+        op: Callable[[Display], Coroutine[Any, Any, T]],
+        disp_filter: Callable[[Display], bool],
+        payload_creator: Callable[
+            [list[Task[T]], list[Display]], list[int | str]
+        ] = lambda *_: [0],
+    ):
+        futures, displays = await display_op(op, disp_filter)
+        return payload_creator(futures, displays)
+
     async def process_client_command(reader, writer):
         async def _close_socket():
             # self.logger.debug("closing the connection")
@@ -519,16 +529,6 @@ async def process_client_commands(err_event: Event) -> None:
             writer.write(response.encode())
             await writer.drain()
             await _close_socket()
-
-        async def disp_op[T](
-            op: Callable[[Display], Coroutine[Any, Any, T]],
-            disp_filter: Callable[[Display], bool],
-            payload_creator: Callable[
-                [list[Task[T]], list[Display]], list[int | str]
-            ] = lambda *_: [0],
-        ):
-            futures, displays = await display_op(op, disp_filter)
-            return payload_creator(futures, displays)
 
         data = (await reader.read()).decode()
         if not data:
@@ -545,7 +545,7 @@ async def process_client_commands(err_event: Event) -> None:
                 async with LOCK:
                     with suppress(RetriableException):
                         payload = [0, *get_brightness(opts, *displays)]
-            case ["setvcp", retry, sleep, *params]:
+            case ["setvcp", retry, sleep, displays, *params]:
                 r = get_retry(
                     retry, sleep, handle_failure_after_retries, init_displays_retry
                 )
@@ -553,9 +553,9 @@ async def process_client_commands(err_event: Event) -> None:
                     payload = await r(
                         disp_op,
                         lambda d: d._set_vcp_feature(*params),
-                        lambda d: d.backend is BackendType.DDCUTIL,
+                        lambda d: d.backend is BackendType.DDCUTIL and (any(x in d.names for x in displays) if displays else True),
                     )
-            case ["getvcp", retry, sleep, *params]:
+            case ["getvcp", retry, sleep, displays, *params]:
                 r = get_retry(
                     retry, sleep, handle_failure_after_retries, init_displays_retry
                 )
@@ -564,7 +564,7 @@ async def process_client_commands(err_event: Event) -> None:
                     payload = await r(
                         disp_op,
                         lambda d: d._get_vcp_feature(*params),
-                        lambda d: d.backend is BackendType.DDCUTIL,
+                        lambda d: d.backend is BackendType.DDCUTIL and (any(x in d.names for x in displays) if displays else True),
                         lambda futures, displays: [
                             0,
                             *[
