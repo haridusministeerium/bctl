@@ -1,4 +1,4 @@
-## 0.0.6 (unreleased)
+## 0.0.6 (2025-12-09)
 ---------------------
 
 - getvcp/setvcp: add -d option to specify display(s)
