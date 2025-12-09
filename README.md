@@ -148,6 +148,9 @@ Some examples:
 - `bctl get` - return current brightness level in %; see the `get_strategy` config
                item in [config.py](./bctl/config.py) to set how differing
                brightnesses get consolidated into a single int
+- `bctl get laptop` - return our laptop/internal screen brightness; note
+  "laptop" here can be either screen ID or our configured alias; "laptop" is an
+  automatically added alias to all laptop/internal displays.
 - `bctl setvcp D6 01` - set vcp feature D6 to value 01 for all detected DDC displays;
   this is simply shortcut for `ddcutil setvcp D6 01`, but executed for all displays.
 
@@ -176,7 +179,6 @@ Likewise, for setting brightness you might define a bash/zsh function similar to
 #
 # @param {digit|string}   percentage to set the brightness level to (without the percentage sign).
 #                         may also prefix with + or - if delta change is wanted.
-#
 # @returns {void}
 set_brightness() {
     local msg

@@ -150,7 +150,7 @@ async def init_displays() -> None:
 
 
 async def sync_displays(opts = 0) -> None:
-    displays = list(filter(get_disp_filter(opts), DISPLAYS))
+    displays = list(filter(get_disp_filter(opts), DISPLAYS)) if opts else DISPLAYS
     if len(displays) <= 1:
         return
     values: list[int] = sorted(d.get_brightness() for d in displays)
@@ -568,8 +568,8 @@ async def process_client_commands(err_event: Event) -> None:
                         lambda futures, displays: [
                             0,
                             *[
-                                f"{displays[i].id},{j.result()}"
-                                for i, j in enumerate(futures)
+                                [displays[i].id, f.result().strip()]
+                                for i, f in enumerate(futures)
                             ],
                         ],
                     )
@@ -624,7 +624,7 @@ async def terminate():
 
 # note raw values only make sense when asked for specific or all displays, as
 # we can't really collate them into a single value as the scales potentially differ
-def get_brightness(opts, display_names) -> list[int | list[str | int]]:
+def get_brightness(opts, display_names) -> tuple[int] | list[list[str | int]]:
     displays = list(filter(get_disp_filter(opts), DISPLAYS)) if opts else DISPLAYS
     if display_names:
         displays = list(
@@ -670,7 +670,7 @@ def get_brightness(opts, display_names) -> list[int | list[str | int]]:
             case GetStrategy.HIGH:
                 val = max(values)
 
-    return [val]
+    return (val,)
 
 
 async def periodic_init(period: int) -> NoReturn:
