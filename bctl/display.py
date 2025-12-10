@@ -6,11 +6,11 @@ import aiofiles.os as aios
 from os import R_OK, W_OK
 from abc import abstractmethod, ABC
 from enum import StrEnum, auto
-from typing import TypeVar
+from typing import TypeVar, Callable
 from asyncio import Task
 from pathlib import Path
 from logging import Logger
-from bctl.common import run_cmd, wait_and_reraise
+from bctl.common import run_cmd, wait_and_reraise, Opts
 from bctl.config import Conf, OffsetType, SimConf
 from bctl.exceptions import ExitableErr, FatalErr
 
@@ -344,6 +344,14 @@ class RawDisplay(NonDDCDisplay):
     async def _set_brightness(self, value: int) -> None:
         async with aiof.open(self.brightness_f, mode="w") as f:
             await f.write(str(value))
+
+
+def get_disp_filter(opts: Opts | int) -> Callable[[Display], bool]:
+    return lambda d: not (
+        (opts & Opts.IGNORE_INTERNAL and d.type is DisplayType.INTERNAL)
+        or opts & Opts.IGNORE_EXTERNAL
+        and d.type is DisplayType.EXTERNAL
+    )
 
 
 TNonDDCDisplay = TypeVar("TNonDDCDisplay", bound=NonDDCDisplay)
