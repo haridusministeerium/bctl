@@ -3,13 +3,19 @@ import glob
 import json
 import itertools
 import logging
+import aiofiles as aiof
 from enum import StrEnum, auto
 from collections.abc import Iterable
-import aiofiles as aiof
-from pydantic import BaseModel
 from pydash import py_
 from datetime import datetime
 from logging import Logger
+from pydantic import (
+    BaseModel,
+    PositiveInt,
+    NonNegativeInt,
+    PositiveFloat,
+    NonNegativeFloat,
+)
 from bctl.common import CACHE_PATH
 from bctl.exceptions import FatalErr
 
@@ -19,16 +25,16 @@ STATE_VER = 1  # bump this whenever persisted state data structure changes
 
 
 class SimConf(BaseModel):
-    ndisplays: int
+    ndisplays: PositiveInt
     wait_sec: float
     initial_brightness: int
     failmode: str | None
-    exit_code: int
+    exit_code: NonNegativeInt
 
 
 class State(BaseModel):
-    timestamp: int = 0
-    ver: int = STATE_VER
+    timestamp: NonNegativeInt = 0
+    ver: NonNegativeInt = STATE_VER
     last_set_brightness: int = -1  # value we've set all displays' brightnesses (roughly) to;
                                    # -1 if brightnesses differ or we haven't set brightness using bctl yet
     offsets: dict[str, list[int]] = {}  # display.id->[offset, eoffset] mappings;
@@ -52,7 +58,7 @@ class NotifyIconConf(BaseModel):
 class NotifyConf(BaseModel):
     enabled: bool = True
     on_fatal_err: bool = True  # whether desktop notifications should be shown on fatal errors
-    timeout_ms: int = 4000
+    timeout_ms: PositiveInt = 4000
     icon: NotifyIconConf = NotifyIconConf()
 
 
@@ -111,8 +117,8 @@ class Conf(BaseModel):
     ddcutil_gvcp_flags: list[str] = []  # flags passed to [ddcutil getvcp] commands
                                         # you might also want to consider ddcutil configuration; see https://www.ddcutil.com/config_file/
     monitor_udev: bool = True  # monitor udev events for drm subsystem to detect ext. display (dis)connections
-    udev_event_debounce_sec: float = 3.0  # both for debouncing & delay; have experienced missed ext. display detection w/ 1.0, but it's flimsy regardless
-    periodic_init_sec: int = 0  # periodically re-init/re-detect monitors; 0 to disable
+    udev_event_debounce_sec: PositiveFloat = 3.0  # both for debouncing & delay; have experienced missed ext. display detection w/ 1.0, but it's flimsy regardless
+    periodic_init_sec: NonNegativeInt = 0  # periodically re-init/re-detect monitors; 0 to disable
     sync_brightness: bool = False  # keep all displays' brightnesses at same value/synchronized
     sync_strategy: tuple[str, ...] = ("mean",)  # if displays' brightnesses differ and are synced, what value to sync them to; only active if sync_brightness=True;
                                 # first matched strategy is applied, i.e. can define as ["id:AUS:PA278QV:L9GMQA215221", "internal", "mean"]
@@ -126,8 +132,8 @@ class Conf(BaseModel):
                                                   # what single value to return to represent current brightness level;
     notify: NotifyConf = NotifyConf()
     offset: OffsetConf = OffsetConf()
-    msg_consumption_window_sec: float = 0.1  # can be set to 0 if no delay/window is required
-    brightness_step: int = 5  # %
+    msg_consumption_window_sec: NonNegativeFloat = 0.1  # can be set to 0 if no delay/window is required
+    brightness_step: PositiveInt = 5  # %
     ignored_displays: set[str] = set()  # either [ddcutil --brief detect] cmd "Monitor:" value, or <device> in /sys/class/backlight/<device>
     ignore_internal_display: bool = False  # do not control internal (i.e. laptop) display if available
     ignore_external_display: bool = False  # do not control external display(s) if available
@@ -137,12 +143,12 @@ class Conf(BaseModel):
     internal_display_ctl: InternalDisplayCtl = InternalDisplayCtl.RAW  # only used if main_display_ctl=ddcutil and we're a laptop
     raw_device_dir: str = "/sys/class/backlight"  # used if main_display_ctl=raw OR
                                                   # (main_display_ctl=ddcutil AND internal_display_ctl=raw AND we're a laptop)
-    fatal_exit_code: int = 100  # exit code signifying fatal exit that should not be retried/restarted;
-                                # you might want to use this value in systemd unit file w/ RestartPreventExitStatus config
+    fatal_exit_code: PositiveInt = 100  # exit code signifying fatal exit that should not be retried/restarted;
+                                        # you might want to use this value in systemd unit file w/ RestartPreventExitStatus config
     sim: SimConf | None = None  # simulation config, will be set by sim client
     state_f_path: str = f"{CACHE_PATH}/bctld.state"  # state that should survive restarts are stored here
     state: State = State()  # will be read in from state_f_path
-    max_state_age_sec: int = 60  # only use persisted state if it's younger than this; <= 0 to always use state regardless of its age
+    max_state_age_sec: NonNegativeInt = 60  # only use persisted state if it's younger than this; 0 to always use state regardless of its age
 
 
 def load_config(load_state: bool = False) -> Conf:
@@ -183,7 +189,7 @@ def _load_state(conf: Conf) -> State:
         v = s.ver
         is_state_young_enough: bool = (
             (unix_time_now() - t <= conf.max_state_age_sec)
-            if conf.max_state_age_sec > 0
+            if conf.max_state_age_sec
             else True
         )
         if is_state_young_enough and v == STATE_VER:
@@ -208,14 +214,14 @@ def intersect[T](iterable_of_iterables: Iterable[Iterable[T]]) -> set[T]:
 async def write_state(conf: Conf) -> None:
     conf.state.timestamp = unix_time_now()
 
+    LOGGER.debug("storing state...")
     try:
-        LOGGER.debug("storing state...")
         payload = conf.state.model_dump_json(indent=2)
         async with aiof.open(conf.state_f_path, mode="w") as f:
             await f.write(payload)
         LOGGER.debug("...state stored")
-    except IOError:
-        raise
+    except Exception as e:
+        LOGGER.error(f"...state storing failed: {e}")
 
 
 def _read_json_bytes_from_file(file_loc: str) -> bytes:
@@ -225,8 +231,8 @@ def _read_json_bytes_from_file(file_loc: str) -> bytes:
     try:
         with open(file_loc, "rb") as f:
             return f.read()
-    except Exception:
-        LOGGER.error(f"error trying to read json as bytes from {file_loc}")
+    except Exception as e:
+        LOGGER.error(f"error trying to read json as bytes from {file_loc}: {e}")
         return b"{}"
 
 
@@ -237,8 +243,8 @@ def _read_dict_from_file(file_loc: str) -> dict:
     try:
         with open(file_loc, "r") as f:
             return json.load(f)
-    except Exception:
-        LOGGER.error(f"error trying to parse json from {file_loc}")
+    except Exception as e:
+        LOGGER.error(f"error trying to parse json from {file_loc}: {e}")
         return {}
 
 
