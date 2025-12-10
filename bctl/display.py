@@ -186,7 +186,7 @@ class SimulatedDisplay(Display):
     async def init(self) -> None:
         await asyncio.sleep(3)
         if self.sim.failmode == "i":
-            raise ExitableErr("error initializing", exit_code=self.sim.exit_code)
+            raise ExitableErr(f"error at [{self.id}] initialization", exit_code=self.sim.exit_code)
         self.raw_brightness = self.sim.initial_brightness
         self.max_brightness = 100
         super()._init()

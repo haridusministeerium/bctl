@@ -71,13 +71,13 @@ class OffsetConf(BaseModel):
                                   # likewise -20 means brightness will be 20% lower than the set limit.
 
     enabled_if: str = ""  # global rule to disable all offsets if this expression does not evaluate true;
-                          # will be eval()'d in init_displays(), dangerous!
+                          # will be eval()'d in resolve_displays(), dangerous!
                           # e.g.:
                           # - "__import__('socket').gethostname() in ['hostname1', 'hostname2']"
                           # - "os.uname().nodename in ['hostname1', 'hostname2']"
                           # - "displays"
     disabled_if: str = ""  # global rule to disable all offsets if this expression evaluates true;
-                           # will be eval()'d in init_displays(), dangerous!
+                           # will be eval()'d in resolve_displays(), dangerous!
                            # e.g.:
                            # - "len(displays) <= 1"
 
@@ -141,7 +141,7 @@ class Conf(BaseModel):
                                 # you might want to use this value in systemd unit file w/ RestartPreventExitStatus config
     sim: SimConf | None = None  # simulation config, will be set by sim client
     state_f_path: str = f"{CACHE_PATH}/bctld.state"  # state that should survive restarts are stored here
-    state: State = State()  # do not set, will be read in from state_f_path
+    state: State = State()  # will be read in from state_f_path
     max_state_age_sec: int = 60  # only use persisted state if it's younger than this; <= 0 to always use state regardless of its age
 
 
@@ -162,6 +162,9 @@ def load_config(load_state: bool = False) -> Conf:
         raise FatalErr(
             f"[aliases] config cannot contain reserved values {reserved_aliases}"
         )
+
+    # order by offset criteria so longer criteria would be matched against first:
+    conf.offset.offsets = {k: v for k, v in sorted(conf.offset.offsets.items(), key=lambda x: len(x[0]), reverse=True)}
 
     # LOGGER.error(f"effective config: {conf}")
     return conf
