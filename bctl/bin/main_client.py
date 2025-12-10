@@ -8,7 +8,7 @@ from bctl.common import Opts
 
 
 def collect_per_disp_args(args: tuple[str, ...]) -> dict[str, int]:
-    p = {}
+    p: dict[str, int] = {}
     # params = []
     for i, item in enumerate(args):
         if i % 2 == 0:
@@ -62,7 +62,7 @@ def up(ctx, delta):
     :param delta: % delta to bump brightness up by
     """
     assert delta is None or delta > 0, (
-        "brightness % to bump up by needs to be positive int"
+        "brightness % to bump up by needs to be a positive int"
     )
     ctx.send_cmd(["up", delta])
 
@@ -77,7 +77,7 @@ def down(ctx, delta):
     :param delta: % delta to bump brightness down by
     """
     assert delta is None or delta > 0, (
-        "brightness % to bump down by needs to be positive int"
+        "brightness % to bump down by needs to be a positive int"
     )
     ctx.send_cmd(["down", delta])
 
@@ -307,7 +307,7 @@ def get(
     if raw and not (all or displays):
         raise ValueError(
             "raw values only make sense per-display, i.e. --raw option "
-            "requires --all OR querying brightness for specific displays"
+            "requires --all OR querying brightness for specific display(s)"
         )
     elif displays and (all or no_external or no_internal):
         raise ValueError(
