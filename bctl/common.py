@@ -1,7 +1,6 @@
 import os
 import asyncio
 import shutil
-from asyncio import Task
 from collections.abc import Sequence
 from enum import IntFlag
 from logging import Logger
@@ -69,7 +68,7 @@ def assert_cmd_exist(cmd: str) -> None:
 # convenience method for waiting for futures' completion. it was created so any
 # exceptions thrown in coroutines would be propagated up, and not swallowed.
 # looks like task cancellation is the key for this, at least w/ return_when=asyncio.FIRST_EXCEPTION
-async def wait_and_reraise(futures: Sequence[Task]) -> None:
+async def wait_and_reraise(futures: Sequence[asyncio.Task]) -> None:
     try:
         done, tasks_to_cancel = await asyncio.wait(
             futures, timeout=5, return_when=asyncio.FIRST_EXCEPTION

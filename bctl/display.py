@@ -158,6 +158,11 @@ class Display(ABC):
         self.logger.debug("getting brightness...")
         return self._get_brightness(raw, no_offset_normalized)
 
+    def get_brightness_opts(self, opts: Opts | int) -> int:
+        self.logger.debug("getting brightness...")
+        return self._get_brightness(opts & Opts.GET_RAW,
+                                    opts & Opts.GET_NO_OFFSET_NORMALIZED)
+
     def _get_brightness(self, raw: bool, no_offset_normalized: bool) -> int:
         return (
             self.raw_brightness - (0 if no_offset_normalized else round(self.eoffset / 100 * self.max_brightness))

@@ -172,7 +172,7 @@ def set(
             raise ValueError("brightness value to set needs to be [-+]?[0-9]+")
     else:
         assert len(args) % 2 == 0, (
-            "when setting multiple displays, then even # or args expected"
+            "when setting for specific displays, then even # or args expected"
         )
         # assert not (no_notify or no_track or no_external or no_internal or no_sync), (
             # "when setting brightnesses per monitor, then additional options are non-op"
@@ -182,7 +182,7 @@ def set(
 
 @main.command
 @click.pass_obj
-@click.option("-r", "--retry", default=0, help="how many times to retry operation")
+@click.option("--retry", default=0, help="how many times to retry operation")
 @click.option(
     "-s", "--sleep", default=0.5, help="how many seconds to sleep between retries"
 )
@@ -195,15 +195,15 @@ def setvcp(
 
     :param ctx: context
     """
-    assert len(args) >= 2, (
-        "minimum 2 args needed, read ddcutil manual on [setvcp] command"
+    assert args and len(args) % 2 == 0, (
+        "one or more feature/value pairs required, read ddcutil manual on [setvcp] command"
     )
     ctx.send_receive_cmd(["setvcp", retry, sleep, display, args])
 
 
-@main.command("set-sync")
+@main.command("set-get")
 @click.pass_obj
-@click.option("-r", "--retry", default=0, help="how many times to retry operation")
+@click.option("--retry", default=0, help="how many times to retry operation")
 @click.option(
     "-s", "--sleep", default=0.5, help="how many seconds to sleep between retries"
 )
@@ -217,8 +217,9 @@ def setvcp(
     is_flag=True,
     help="do NOT normalize brightness value for effective offset; only affects the response format",
 )
+@click.option("-r", "--raw", is_flag=True, help="retrieve raw brightness value")
 @click.argument("args", nargs=-1, type=str)
-def set_sync(
+def set_get(
     ctx,
     retry: int,
     sleep: float | int,
@@ -226,41 +227,47 @@ def set_sync(
     no_track: bool,
     no_sync: bool,
     no_offset: bool,
+    raw: bool,
     args: tuple[str, ...],
 ):
-    """similar to multi-argument set(), but synchronized. think of it as set-get
+    """similar to multi-argument set(), but synchronized, and returns new brighnesses
+       of all the displays that the change operated on.
 
     :param ctx: context
     :param value: % value to change brightness to/by
     """
     if not args:
         raise ValueError("params missing")
-    elif len(args) == 1:
+
+    opts = pack_opts(
+        no_notify=no_notify,
+        no_track=no_track,
+        no_sync=no_sync,
+    )
+    if no_offset:
+        opts |= Opts.GET_NO_OFFSET_NORMALIZED
+    if raw:
+        opts |= Opts.GET_RAW
+
+    if len(args) == 1:
         v = args[0]
         assert v.isdigit(), "display brightness must be a digit"
         v = int(v)
         assert 0 <= v <= 100, "display brightness must be 0 <= value <= 100"
-        opts = pack_opts(
-            no_notify=no_notify,
-            no_track=no_track,
-            no_sync=no_sync,
-        )
-        if no_offset:
-            opts |= Opts.GET_NO_OFFSET_NORMALIZED
-        ctx.send_receive_cmd(["set_sync", retry, sleep, opts, v])
+        ctx.send_receive_cmd(["set_get", retry, sleep, opts, v])
     else:
         assert len(args) % 2 == 0, (
-            "when setting multiple displays, then even # or args expected"
+            "when when setting for specific displays, then even # or args expected"
         )
-        # assert not (no_notify or no_track or no_sync or no_offset), (
-            # "when setting brightnesses per monitor, then additional options are non-op"
+        # assert not (no_notify or no_track or no_sync), (
+            # "when setting brightnesses per monitor, then [--no-notify, --no-track & --no-sync] are no-op"
         # )
-        ctx.send_receive_cmd(["set_for_sync", retry, sleep, collect_per_disp_args(args)])
+        ctx.send_receive_cmd(["set_get_for", retry, sleep, opts, collect_per_disp_args(args)])
 
 
 @main.command
 @click.pass_obj
-@click.option("-r", "--retry", default=0, help="how many times to retry operation")
+@click.option("--retry", default=0, help="how many times to retry operation")
 @click.option(
     "-s", "--sleep", default=0.5, help="how many seconds to sleep between retries"
 )
@@ -327,7 +334,7 @@ def get(
 
 @main.command
 @click.pass_obj
-@click.option("-r", "--retry", default=0, help="how many times to retry operation")
+@click.option("--retry", default=0, help="how many times to retry operation")
 @click.option(
     "-s", "--sleep", default=0.5, help="how many seconds to sleep between retries"
 )

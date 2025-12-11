@@ -107,7 +107,8 @@ async def sync_displays(opts=0) -> None:
                 case _:
                     prefix = "id:"
                     if strat.startswith(prefix):
-                        d = next((d for d in displays if strat[len(prefix):] in d.names), None)
+                        name = strat[len(prefix):]
+                        d = next((d for d in displays if name in d.names), None)
                         if d: break
                     else:
                         raise FatalErr(
@@ -262,7 +263,10 @@ async def process_q() -> NoReturn:
 
 
 def get_retry(
-    retries, sleep, on_exhaustion: bool | Callable = False, on_exception=None
+    retries: int,
+    sleep: float | int,
+    on_exhaustion: bool | Callable = False,
+    on_exception=None,
 ) -> RetryAsync:
     return RetryAsync(
         RetriableException,
@@ -282,6 +286,7 @@ def handle_failure_after_retries(e: Exception):
 async def process_client_commands(err_event: Event) -> None:
     init_displays_retry_handler = get_retry(2, 0.3, True)
     init_displays_retry = partial(init_displays_retry_handler, init_displays)
+    err_payload = [1]
 
     # this wrapper is so exceptions from serve_forever() callbacks (which are not
     # awaited on) get propagated up to our taskgroup.
@@ -324,28 +329,28 @@ async def process_client_commands(err_event: Event) -> None:
             return
         data = json.loads(data)
         LOGGER.debug(f"received task {data} from client")
-        payload = [1]
+        payload = err_payload
         match data:
             case ["get"]:
                 async with LOCK:
                     with suppress(RetriableException):
                         payload = [0, *get_brightness(0, False)]
-            case ["get", opts, *displays]:
+            case ["get", opts, displays]:
                 async with LOCK:
                     with suppress(RetriableException):
-                        payload = [0, *get_brightness(opts, *displays)]
-            case ["setvcp", retry, sleep, displays, *params]:
+                        payload = [0, *get_brightness(opts, displays)]
+            case ["setvcp", retry, sleep, displays, params]:
                 r = get_retry(
                     retry, sleep, handle_failure_after_retries, init_displays_retry
                 )
                 async with LOCK:
                     payload = await r(
                         disp_op,
-                        lambda d: d._set_vcp_feature(*params),
+                        lambda d: d._set_vcp_feature(params),
                         lambda d: d.backend is BackendType.DDCUTIL
                         and (any(x in d.names for x in displays) if displays else True),
                     )
-            case ["getvcp", retry, sleep, displays, *params]:
+            case ["getvcp", retry, sleep, displays, params]:
                 r = get_retry(
                     retry, sleep, handle_failure_after_retries, init_displays_retry
                 )
@@ -353,7 +358,7 @@ async def process_client_commands(err_event: Event) -> None:
                 async with LOCK:
                     payload = await r(
                         disp_op,
-                        lambda d: d._get_vcp_feature(*params),
+                        lambda d: d._get_vcp_feature(params),
                         lambda d: d.backend is BackendType.DDCUTIL
                         and (any(x in d.names for x in displays) if displays else True),
                         lambda futures, displays: [
@@ -364,30 +369,32 @@ async def process_client_commands(err_event: Event) -> None:
                             ],
                         ],
                     )
-            case ["set_for_sync", retry, sleep, disp_to_brightness]:
-                r = get_retry(
-                    retry, sleep, handle_failure_after_retries, init_displays_retry
-                )
+            case ["set_get_for", retry, sleep, opts, disp_to_brightness]:
+                r = get_retry(retry, sleep, on_exception=init_displays_retry)
                 async with LOCK:
-                    payload = await r(
-                        disp_op,
-                        lambda d: d.set_brightness(
-                            next(
-                                disp_to_brightness[x]
-                                for x in d.names
-                                if x in disp_to_brightness
-                            )
-                        ),
-                        lambda d: any(x in disp_to_brightness for x in d.names),
-                        lambda futures, displays: [
+                    with suppress(RetriableException):
+                        futures, displays = await r(
+                            display_op,
+                            lambda d: d.set_brightness(
+                                next(
+                                    disp_to_brightness[x]
+                                    for x in d.names
+                                    if x in disp_to_brightness
+                                )
+                            ),
+                            lambda d: any(x in disp_to_brightness for x in d.names),
+                        )
+                        payload = [
                             0,
                             *[
-                                [displays[i].id, f.result()]
-                                for i, f in enumerate(futures)
+                                [
+                                    d.id,
+                                    d.get_brightness_opts(opts),
+                                ]
+                                for d in displays
                             ],
-                        ],
-                    )
-            case ["set_sync", retry, sleep, opts, value]:
+                        ]
+            case ["set_get", retry, sleep, opts, value]:
                 r = get_retry(retry, sleep, on_exception=init_displays_retry)
                 async with LOCK:
                     with suppress(RetriableException):
@@ -401,16 +408,14 @@ async def process_client_commands(err_event: Event) -> None:
                             *[
                                 [
                                     d.id,
-                                    d.get_brightness(
-                                        no_offset_normalized=opts
-                                        & Opts.GET_NO_OFFSET_NORMALIZED
-                                    ),
+                                    d.get_brightness_opts(opts),
                                 ]
                                 for d in displays
                             ],
                         ]
             case ["set_for_async", disp_to_brightness]:
                 # TODO: consider passing OnErrOpts.RUN_ON_LAST_TRY to retry opts; with that we might even change to retries=0
+                await _close_socket()
                 r = get_retry(1, 0.5, True, init_displays_retry)
                 async with LOCK:
                     await r(
@@ -424,12 +429,11 @@ async def process_client_commands(err_event: Event) -> None:
                         ),
                         lambda d: any(x in disp_to_brightness for x in d.names),
                     )
-                await _close_socket()
                 return
             case _:
+                await _close_socket()
                 LOGGER.debug("placing task in queue...")
                 await TASK_QUEUE.put(data)
-                await _close_socket()
                 return
         await _send_response(payload)
 
@@ -471,14 +475,11 @@ def get_brightness(opts, display_names) -> tuple[int] | list[tuple[str, int]]:
     if not displays:
         return []
     elif opts & Opts.GET_ALL or display_names:
-        # return [f'{d.id},{d.get_brightness(raw=opts & Opts.GET_RAW, no_offset_normalized=opts & Opts.GET_NO_OFFSET_NORMALIZED)}' for d in displays]
+        # return [f'{d.id},{d.get_brightness_opts(opts)}' for d in displays]
         return [
             (
                 d.id,
-                d.get_brightness(
-                    raw=opts & Opts.GET_RAW,
-                    no_offset_normalized=opts & Opts.GET_NO_OFFSET_NORMALIZED,
-                ),
+                d.get_brightness_opts(opts),
             )
             for d in displays
         ]

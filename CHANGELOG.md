@@ -1,7 +1,12 @@
 ## 0.0.7 (unreleased)
 ---------------------
 
-- Nothing changed yet.
+- client:
+  - rename set-sync command to set-get
+  - set-get gains the --raw option
+  - make the two paths of set-get() return the same result, as in displays
+    that were operated on will get queried for get_brightness()
+  - client: all --retry/-r options lose the shorthand opt, as it collides w/ --raw/-r
 
 
 ## 0.0.6 (2025-12-09)
