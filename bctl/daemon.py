@@ -50,6 +50,23 @@ NOTIF: Notif
 LAST_INIT_TIME: int = 0
 
 
+def get_retry(
+    retries: int,
+    sleep: float | int,
+    on_exhaustion: bool | Callable = False,
+    on_exception=None,
+) -> RetryAsync:
+    return RetryAsync(
+        RetriableException,
+        retries=retries,
+        backoff=sleep,
+        on_exhaustion=on_exhaustion,
+        on_exception=on_exception,
+    ).__call__
+
+NO_RETRY_NO_THROW: RetryAsync = get_retry(0, 0, on_exhaustion=True)
+
+
 def validate_ext_deps() -> None:
     requirements = [CONF.main_display_ctl, CONF.internal_display_ctl]
     for dep in ["ddcutil", "brillo", "brightnessctl"]:
@@ -172,7 +189,9 @@ async def execute_tasks(tasks: list[list]) -> None:
                     # futures.append(asyncio.create_task(d.set_brightness(value)))
             # TODO: perhaps it's safer to remove on_exhaustion from init calls and allow the daemon to crash?:
             case ["init"]:  # re-init displays
-                init_retry = get_retry(0, 0, on_exhaustion=True)
+                init_retry = NO_RETRY_NO_THROW
+            case ["init", 0, _]:  # re-init displays
+                init_retry = NO_RETRY_NO_THROW
             case ["init", retry, sleep]:  # re-init displays
                 init_retry = get_retry(retry, sleep, on_exhaustion=True)
             case ["sync"]:
@@ -260,21 +279,6 @@ async def process_q() -> NoReturn:
                 break
         async with LOCK:
             await execute_tasks(tasks)
-
-
-def get_retry(
-    retries: int,
-    sleep: float | int,
-    on_exhaustion: bool | Callable = False,
-    on_exception=None,
-) -> RetryAsync:
-    return RetryAsync(
-        RetriableException,
-        retries=retries,
-        backoff=sleep,
-        on_exhaustion=on_exhaustion,
-        on_exception=on_exception,
-    ).__call__
 
 
 def handle_failure_after_retries(e: Exception):

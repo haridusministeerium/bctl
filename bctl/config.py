@@ -73,8 +73,8 @@ class OffsetConf(BaseModel):
     type: OffsetType = OffsetType.HARD
     offsets: dict[str, int] = {}  # criteria -> offset rules; accepted keys are "internal", "external", "any", "id:<id>";
                                   # <id> being [ddcutil --brief detect] cmd "Monitor:" value (or alias).
-                                  # offset of 20 means those displays' brightness will be 20% over the set limit;
-                                  # likewise -20 means brightness will be 20% lower than the set limit.
+                                  # offset of 20 means those displays' brightness will be 20% over the set value;
+                                  # likewise -20 means brightness will be 20% lower than the set brightness.
 
     enabled_if: str = ""  # global rule to disable all offsets if this expression does not evaluate true;
                           # will be eval()'d in resolve_displays(), dangerous!
@@ -114,7 +114,7 @@ class Conf(BaseModel):
     ddcutil_svcp_flags: list[str] = [  # flags passed to [ddcutil setvcp] commands
         "--skip-ddc-checks"
     ]
-    ddcutil_gvcp_flags: list[str] = []  # flags passed to [ddcutil getvcp] commands
+    ddcutil_gvcp_flags: list[str] = []  # flags passed to [ddcutil getvcp] commands; if output is consumed by a script, then "--brief" flag is recommended.
                                         # you might also want to consider ddcutil configuration; see https://www.ddcutil.com/config_file/
     monitor_udev: bool = True  # monitor udev events for drm subsystem to detect ext. display (dis)connections
     udev_event_debounce_sec: PositiveFloat = 3.0  # both for debouncing & delay; have experienced missed ext. display detection w/ 1.0, but it's flimsy regardless
@@ -134,7 +134,7 @@ class Conf(BaseModel):
     offset: OffsetConf = OffsetConf()
     msg_consumption_window_sec: NonNegativeFloat = 0.1  # can be set to 0 if no delay/window is required
     brightness_step: PositiveInt = 5  # %
-    ignored_displays: set[str] = set()  # either [ddcutil --brief detect] cmd "Monitor:" value, or <device> in /sys/class/backlight/<device>
+    ignored_displays: set[str] = set()  # either [ddcutil --brief detect] cmd "Monitor:" values, or <device> in /sys/class/backlight/<device>, or aliases
     ignore_internal_display: bool = False  # do not control internal (i.e. laptop) display if available
     ignore_external_display: bool = False  # do not control external display(s) if available
     aliases: dict[str, tuple[str, ...]] = {}  # aliases to display IDs; cannot use "laptop" or "internal",

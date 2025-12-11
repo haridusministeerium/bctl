@@ -145,14 +145,19 @@ Some examples:
 - `bctl set +20` - bump brightness up by 20%
 - `bctl set -- -20` - bump brightness down by 20%
 - `bctl set 55` - set brightness to 55%
+- `bctl set laptop 30` - set laptop screen brightness to 30%; note "laptop" here can
+                         be either screen ID or your configured alias; "laptop" is an
+                         automatically added alias to all laptop/internal displays.
 - `bctl get` - return current brightness level in %; see the `get_strategy` config
                item in [config.py](./bctl/config.py) to set how differing
                brightnesses get consolidated into a single int
-- `bctl get laptop` - return our laptop/internal screen brightness; note
-  "laptop" here can be either screen ID or our configured alias; "laptop" is an
-  automatically added alias to all laptop/internal displays.
+- `bctl get laptop` - return laptop/internal screen brightness; just as with
+                      the 'set' example above, "laptop" here is an alias.
 - `bctl setvcp D6 01` - set vcp feature D6 to value 01 for all detected DDC displays;
-  this is simply shortcut for `ddcutil setvcp D6 01`, but executed for all displays.
+                        this is simply shortcut for `ddcutil setvcp D6 01`,
+                        but executed for all displays.
+- `bctl getvcp -d display1 10` - get vcp feature 10 of screen with alias "display1";
+                                 this is a shortcut for `ddcutil getvcp 10`
 
 The daemon also registers signal handlers for `SIGUSR1` & `SIGUSR2`, so
 sending said signals to the daemon process allows bumping brightness up
