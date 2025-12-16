@@ -301,3 +301,4 @@ re-initialize its state by sending init command via the client: `$ bctl init`
 
 - https://github.com/digitaltrails/vdu_controls
 - https://github.com/orhun/i3-workspace-brightness
+- https://github.com/max-baz/wluma - Automatic brightness adjustment based on screen contents and ALS

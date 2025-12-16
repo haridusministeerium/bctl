@@ -75,6 +75,8 @@ class OffsetConf(BaseModel):
                                   # <id> being [ddcutil --brief detect] cmd "Monitor:" value (or alias).
                                   # offset of 20 means those displays' brightness will be 20% over the set value;
                                   # likewise -20 means brightness will be 20% lower than the set brightness.
+    enabled_if_single_display: bool = False  # whether configured offset should be applied
+                                             # if it's the only connected screen
 
     enabled_if: str = ""  # global rule to disable all offsets if this expression does not evaluate true;
                           # will be eval()'d in resolve_displays(), dangerous!

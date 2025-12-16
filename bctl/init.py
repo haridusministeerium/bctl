@@ -90,12 +90,11 @@ async def resolve_displays(conf: Conf) -> Sequence[Display]:
 
         # note offset nullification needs to happen _after_ displays have been init()'d:
         enabled_rule = conf.offset.enabled_if
-        if enabled_rule and not eval(enabled_rule):
-            LOGGER.debug(f"[{enabled_rule}] evaluated false, disabling offsets...")
-            nullify_offset(displays)
         disabled_rule = conf.offset.disabled_if
-        if disabled_rule and eval(disabled_rule):
-            LOGGER.debug(f"[{disabled_rule}] evaluated true, disabling offsets...")
+        if ((enabled_rule and not eval(enabled_rule)) or
+                (disabled_rule and eval(disabled_rule)) or
+                (len(displays) == 1 and not conf.offset.enabled_if_single_display)):
+            LOGGER.debug("disabling all offsets")
             nullify_offset(displays)
 
     LOGGER.debug(
