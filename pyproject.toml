@@ -1,6 +1,6 @@
 [project]
 name = "bctl"
-version = "0.0.7.dev0"
+version = "0.0.7"
 description = "service for controlling brightness of laptop & external displays"
 readme = "README.md"
 requires-python = ">=3.12"
