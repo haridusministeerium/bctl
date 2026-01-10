@@ -43,9 +43,10 @@ class Display(ABC):
         self.offset_state: list[int] = []  # [offset, eoffset], references the array in state
         self.names: set[str] = set((self.id,) + self.conf.aliases.get(self.id, ()))
         if self.type is DisplayType.INTERNAL:
-            self.names.update(["laptop", "internal"])
+            self.names.update(("laptop", "internal"))
         if not id:
             raise FatalErr(f"{self.type} {self.backend} ID falsy")
+        self._init_offset()  # invoke last
 
     def _init_offset(self) -> None:
         for crit, offset in self.conf.offset.offsets.items():
@@ -89,8 +90,6 @@ class Display(ABC):
 
     # note this needs to be the very last init step!
     def _init(self) -> None:
-        self._init_offset()
-
         if self.raw_brightness < 0:
             raise FatalErr(
                 f"[{self.id}] raw_brightness appears to be uninitialized: {self.raw_brightness}"

@@ -131,8 +131,8 @@ $ systemctl --user enable --now bctld.service
 
 ### Client
 
-With daemon running, the client is used to send commands to the daemon. List
-available commands via `bctl --help`
+With daemon running, the client is used to send commands to it. List available
+commands via `bctl --help`
 
 Some examples:
 

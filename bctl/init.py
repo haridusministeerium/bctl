@@ -85,10 +85,6 @@ async def resolve_displays(conf: Conf) -> Sequence[Display]:
         raise RuntimeError("more than 1 laptop/internal displays found")
 
     if displays:
-        futures: list[Task[None]] = [asyncio.create_task(d.init()) for d in displays]
-        await wait_and_reraise(futures)
-
-        # note offset nullification needs to happen _after_ displays have been init()'d:
         enabled_rule = conf.offset.enabled_if
         disabled_rule = conf.offset.disabled_if
         if ((enabled_rule and not eval(enabled_rule)) or
@@ -96,6 +92,8 @@ async def resolve_displays(conf: Conf) -> Sequence[Display]:
                 (len(displays) == 1 and not conf.offset.enabled_if_single_display)):
             LOGGER.debug("disabling all offsets")
             nullify_offset(displays)
+        futures: list[Task[None]] = [asyncio.create_task(d.init()) for d in displays]
+        await wait_and_reraise(futures)
 
     LOGGER.debug(
         f"...initialized {len(displays)} display{'' if len(displays) == 1 else 's'}"
