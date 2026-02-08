@@ -1,3 +1,4 @@
+# see also following for simple notif over dbus: https://ramit-mitra.medium.com/post-a-custom-notification-in-linux-using-python-951e1d273b79
 from dbus_next import Variant
 from desktop_notify.aio import Server as AioNotifServer
 from bctl.config import NotifyConf, NotifyIconConf
