@@ -116,17 +116,17 @@ async def sync_displays(opts=0) -> None:
                     target = max(values)
                     break
                 case "internal":
-                    d = next((d for d in displays if d.type is DisplayType.INTERNAL), None)
-                    if d: break
+                    if (d := next((d for d in displays if d.type is DisplayType.INTERNAL), None)):
+                        break
                 case "external":
-                    d = next((d for d in displays if d.type is DisplayType.EXTERNAL), None)
-                    if d: break
+                    if (d := next((d for d in displays if d.type is DisplayType.EXTERNAL), None)):
+                        break
                 case _:
                     prefix = "id:"
                     if strat.startswith(prefix):
                         name = strat[len(prefix):]
-                        d = next((d for d in displays if name in d.names), None)
-                        if d: break
+                        if (d := next((d for d in displays if name in d.names), None)):
+                            break
                     else:
                         raise FatalErr(
                             f"misconfigured brightness sync strategy [{strat}]"
