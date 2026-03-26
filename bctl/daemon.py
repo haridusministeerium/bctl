@@ -565,6 +565,7 @@ async def run() -> None:
             exit_code: int = ee.exit_code
         else:
             exit_code: int = CONF.fatal_exit_code
+        LOGGER.debug(ee, stack_info=True, exc_info=True)
         LOGGER.debug(f"{type(ee).__name__} caught, exiting with code {exit_code}...")
         await NOTIF.notify_err(ee)
         sys.exit(exit_code)

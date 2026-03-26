@@ -1,7 +1,13 @@
+## 0.0.9 (unreleased)
+---------------------
+
+- log caught exception stacktrace at debug level
+- fix monitor model parsing from ddcutil's "Monitor:" line
+
 ## 0.0.8 (unreleased)
 ---------------------
 
-- Nothing changed yet.
+release yanked
 
 
 ## 0.0.7 (2026-01-03)

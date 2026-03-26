@@ -37,6 +37,7 @@ class Display(ABC):
         self.conf: Conf = conf
         self.raw_brightness: int = -1  # raw, i.e. potentially not a percentage if max_brightness != 100
         self.max_brightness: int = -1
+        self.is_percentage: bool  # whether this device brightness is natively measured in percentage; e.g. laptop screens tend not to be
         self.logger: Logger = logging.getLogger(f"{type(self).__name__}.{self.id}")
         self.offset: int = 0  # percent
         self.eoffset: int = 0  # effective offset, percent
@@ -64,12 +65,11 @@ class Display(ABC):
                     break
                 case _:
                     prefix = "id:"
-                    if crit.startswith(prefix):
-                        if crit[len(prefix) :] in self.names:
-                            self.offset = offset
-                            break
-                    else:
+                    if not crit.startswith(prefix):
                         raise FatalErr(f"misconfigured offset criteria [{crit}]")
+                    elif crit[len(prefix) :] in self.names:
+                        self.offset = offset
+                        break
 
         # hydrate eoffset config from state;
         # has to be invoked _after_ we've resolved display offset above!
@@ -101,6 +101,7 @@ class Display(ABC):
         if self.max_brightness < self.raw_brightness:
             raise FatalErr("max_brightness cannot be smaller than raw_brightness")
 
+        self.is_percentage = self.max_brightness == 100
         self.logger.debug(
             f"  -> initialized {self.type} display: "
             f"brightness {self._get_brightness(False, True)}, "
@@ -138,7 +139,7 @@ class Display(ABC):
             # print(f"   -> target: {target}, eoffset: {self.eoffset}")
             value = target
 
-        value = round(value / 100 * self.max_brightness)  # convert to raw
+        value = self._to_raw(value)
 
         if value != self.raw_brightness:
             self.logger.debug(
@@ -164,10 +165,13 @@ class Display(ABC):
 
     def _get_brightness(self, raw: bool, no_offset_normalized: bool) -> int:
         return (
-            self.raw_brightness - (0 if no_offset_normalized else round(self.eoffset / 100 * self.max_brightness))
+            self.raw_brightness - (0 if no_offset_normalized else self._to_raw(self.eoffset))
             if raw
-            else round(self.raw_brightness / self.max_brightness * 100) - (0 if no_offset_normalized else self.eoffset)
+            else (self.raw_brightness if self.is_percentage else round(self.raw_brightness / self.max_brightness * 100)) - (0 if no_offset_normalized else self.eoffset)
         )
+
+    def _to_raw(self, val: int) -> int:
+        return val if self.is_percentage else round(val / 100 * self.max_brightness)
 
 
 # display baseclass that's not backed by ddcutil
@@ -215,7 +219,7 @@ class DDCDisplay(Display):
                 i = line.find(conf.ddcutil_bus_path_prefix)
                 self.bus = line[len(conf.ddcutil_bus_path_prefix) + i :]
             elif line.startswith("Monitor:"):
-                id = line.split()[1]
+                id = line.split(maxsplit=1)[1]
 
         super().__init__(id, DisplayType.EXTERNAL, BackendType.DDCUTIL, conf)
 

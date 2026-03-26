@@ -210,7 +210,7 @@ part of internal comms spec.
 ## Configuration
 
 User configuration files are read from `$XDG_CONFIG_HOME/bctl/*.json`. The
-generated config will be the merger of all json files, with files ordered
+effective config will be the merger of all json files, with files ordered
 by the lexical order of their names.
 For full config list see the [config.py](./bctl/config.py) file that defines the
 defaults and contains their descriptions, but the most important ones you might
@@ -304,3 +304,4 @@ re-initialize its state by sending init command via the client: `$ bctl init`
 - https://github.com/orhun/i3-workspace-brightness
 - https://github.com/max-baz/wluma - Automatic brightness adjustment based on screen contents and ALS
 - https://github.com/DarkArc/ddcrelight - Automatic monitor brightness adjustment for Linux using yoctopuce light sensor hardware
+
