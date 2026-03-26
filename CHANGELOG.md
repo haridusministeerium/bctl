@@ -1,4 +1,4 @@
-## 0.0.9 (unreleased)
+## 0.0.9 (2026-03-26)
 ---------------------
 
 - log caught exception stacktrace at debug level
