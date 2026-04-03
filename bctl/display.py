@@ -41,7 +41,7 @@ class Display(ABC):
         self.logger: Logger = logging.getLogger(f"{type(self).__name__}.{self.id}")
         self.offset: int = 0  # percent
         self.eoffset: int = 0  # effective offset, percent
-        self.offset_state: list[int] = []  # [offset, eoffset], references the array in state
+        self.offset_state: list[int]  # [offset, eoffset], references the array in state
         self.names: set[str] = set((self.id,) + self.conf.aliases.get(self.id, ()))
         if self.type is DisplayType.INTERNAL:
             self.names.update(("laptop", "internal"))
@@ -94,11 +94,11 @@ class Display(ABC):
             raise FatalErr(
                 f"[{self.id}] raw_brightness appears to be uninitialized: {self.raw_brightness}"
             )
-        if self.max_brightness <= 0:
+        elif self.max_brightness <= 0:
             raise FatalErr(
                 f"[{self.id}] max_brightness appears to be uninitialized: {self.max_brightness}"
             )
-        if self.max_brightness < self.raw_brightness:
+        elif self.max_brightness < self.raw_brightness:
             raise FatalErr("max_brightness cannot be smaller than raw_brightness")
 
         self.is_percentage = self.max_brightness == 100
@@ -139,14 +139,13 @@ class Display(ABC):
             # print(f"   -> target: {target}, eoffset: {self.eoffset}")
             value = target
 
-        value = self._to_raw(value)
-
-        if value != self.raw_brightness:
+        value_raw = self._to_raw(value)
+        if value_raw != self.raw_brightness:
             self.logger.debug(
-                f"setting brightness to {value} ({round(value / self.max_brightness * 100)}%)..."
+                f"setting brightness to {value_raw} ({value}%)..."
             )
-            await self._set_brightness(value)
-            self.raw_brightness = value
+            await self._set_brightness(value_raw)
+            self.raw_brightness = value_raw
         return self._get_brightness(False, False)
 
     async def adjust_brightness(self, delta: int) -> int:
@@ -167,11 +166,14 @@ class Display(ABC):
         return (
             self.raw_brightness - (0 if no_offset_normalized else self._to_raw(self.eoffset))
             if raw
-            else (self.raw_brightness if self.is_percentage else round(self.raw_brightness / self.max_brightness * 100)) - (0 if no_offset_normalized else self.eoffset)
+            else self._to_percent(self.raw_brightness) - (0 if no_offset_normalized else self.eoffset)
         )
 
     def _to_raw(self, val: int) -> int:
         return val if self.is_percentage else round(val / 100 * self.max_brightness)
+
+    def _to_percent(self, val: int) -> int:
+        return val if self.is_percentage else round(val / self.max_brightness * 100)
 
 
 # display baseclass that's not backed by ddcutil
@@ -326,23 +328,24 @@ class RawDisplay(NonDDCDisplay):
 
     async def init(self) -> None:
         self.brightness_f = Path(self.device_dir, "brightness")
-
         if not (
             await aios.path.isfile(self.brightness_f)
             and await aios.access(self.brightness_f, R_OK)
             and await aios.access(self.brightness_f, W_OK)
         ):
             raise FatalErr(f"[{self.brightness_f}] is not a file w/ RW perms")
-
         # self.raw_brightness = int(self.brightness_f.read_text().strip())  # non-async
         self.raw_brightness = await self._read_int(self.brightness_f)
 
         max_brightness_f = Path(self.device_dir, "max_brightness")
-        if await aios.path.isfile(max_brightness_f) and await aios.access(
-            max_brightness_f, R_OK
+        if not (
+            await aios.path.isfile(max_brightness_f)
+            and await aios.access(max_brightness_f, R_OK)
         ):
-            # self.max_brightness = int(max_brightness_f.read_text().strip())  # non-async
-            self.max_brightness = await self._read_int(max_brightness_f)
+            raise FatalErr(f"[{max_brightness_f}] is not a file w/ read perms")
+        # self.max_brightness = int(max_brightness_f.read_text().strip())  # non-async
+        self.max_brightness = await self._read_int(max_brightness_f)
+
         super()._init()
 
     async def _read_int(self, file: Path) -> int:
@@ -364,3 +367,4 @@ def get_disp_filter(opts: Opts | int) -> Callable[[Display], bool]:
 
 TNonDDCDisplay = TypeVar("TNonDDCDisplay", bound=NonDDCDisplay)
 TDisplay = TypeVar("TDisplay", bound=Display)
+

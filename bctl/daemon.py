@@ -612,6 +612,6 @@ def main(debug: bool, load_state: bool, sim_conf: SimConf | None = None) -> None
     NOTIF = Notif(CONF.notify)
 
     log_lvl = logging.DEBUG if debug else getattr(logging, CONF.log_lvl)
-    logging.basicConfig(stream=sys.stdout, level=log_lvl)
+    logging.basicConfig(stream=sys.stdout, level=log_lvl, force=True)
 
     asyncio.run(run())

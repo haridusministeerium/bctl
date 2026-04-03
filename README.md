@@ -136,14 +136,14 @@ commands via `bctl --help`
 
 Some examples:
 
-- `bctl up` - bump brightness up by `brightness_step` config
-- `bctl down` - bump brightness down by `brightness_step` config
-- `bctl up 20` - bump brightness up by 20%
-- `bctl down 20` - bump brightness down by 20%
-- `bctl delta 20` - bump brightness up by 20%
-- `bctl delta -- -20` - bump brightness down by 20%
-- `bctl set +20` - bump brightness up by 20%
-- `bctl set -- -20` - bump brightness down by 20%
+- `bctl up` - increase brightness by `brightness_step` config
+- `bctl down` - decrease brightness by `brightness_step` config
+- `bctl up 20` - increase brightness by 20%
+- `bctl down 20` - decrease brightness by 20%
+- `bctl delta 20` - increase brightness by 20%
+- `bctl delta -- -20` - decrease brightness by 20%
+- `bctl set +20` - increase brightness by 20%
+- `bctl set -- -20` - decrease brightness by 20%
 - `bctl set 55` - set brightness to 55%
 - `bctl set laptop 30` - set laptop screen brightness to 30%; note "laptop" here can
                          be either screen ID or your configured alias; "laptop" is an
