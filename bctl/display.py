@@ -34,19 +34,19 @@ class Display(ABC):
         self.id: str = id  # for ddcutil detect, it's the 'Monitor:' value; for laptop display it's the <device> in /sys/class/backlight/<device>
         self.type: DisplayType = dt
         self.backend: BackendType = bt
+        if not id:
+            raise FatalErr(f"{self.type} {self.backend} ID falsy")
         self.conf: Conf = conf
         self.raw_brightness: int = -1  # raw, i.e. potentially not a percentage if max_brightness != 100
         self.max_brightness: int = -1
         self.is_percentage: bool  # whether this device brightness is natively measured in percentage; e.g. laptop screens tend not to be
         self.logger: Logger = logging.getLogger(f"{type(self).__name__}.{self.id}")
-        self.offset: int = 0  # percent
+        self.offset: int = 0   # percent
         self.eoffset: int = 0  # effective offset, percent
         self.offset_state: list[int]  # [offset, eoffset], references the array in state
         self.names: set[str] = set((self.id,) + self.conf.aliases.get(self.id, ()))
         if self.type is DisplayType.INTERNAL:
             self.names.update(("laptop", "internal"))
-        if not id:
-            raise FatalErr(f"{self.type} {self.backend} ID falsy")
         self._init_offset()  # invoke last
 
     def _init_offset(self) -> None:
@@ -73,8 +73,7 @@ class Display(ABC):
 
         # hydrate eoffset config from state;
         # has to be invoked _after_ we've resolved display offset above!
-        o_state: list[int] | None = self.conf.state.offsets.get(self.id, None)
-        if o_state:
+        if (o_state := self.conf.state.offsets.get(self.id, None)):
             if self.offset == o_state[0]:
                 self.eoffset = o_state[1]
             elif self.offset == 0:
@@ -329,8 +328,7 @@ class RawDisplay(NonDDCDisplay):
     async def init(self) -> None:
         self.brightness_f = Path(self.device_dir, "brightness")
         if not (
-            await aios.path.isfile(self.brightness_f)
-            and await aios.access(self.brightness_f, R_OK)
+            await has_read_perms(self.brightness_f)
             and await aios.access(self.brightness_f, W_OK)
         ):
             raise FatalErr(f"[{self.brightness_f}] is not a file w/ RW perms")
@@ -338,10 +336,7 @@ class RawDisplay(NonDDCDisplay):
         self.raw_brightness = await self._read_int(self.brightness_f)
 
         max_brightness_f = Path(self.device_dir, "max_brightness")
-        if not (
-            await aios.path.isfile(max_brightness_f)
-            and await aios.access(max_brightness_f, R_OK)
-        ):
+        if not await has_read_perms(max_brightness_f):
             raise FatalErr(f"[{max_brightness_f}] is not a file w/ read perms")
         # self.max_brightness = int(max_brightness_f.read_text().strip())  # non-async
         self.max_brightness = await self._read_int(max_brightness_f)
@@ -363,6 +358,10 @@ def get_disp_filter(opts: Opts | int) -> Callable[[Display], bool]:
         or opts & Opts.IGNORE_EXTERNAL
         and d.type is DisplayType.EXTERNAL
     )
+
+
+async def has_read_perms(file: Path) -> bool:
+    return await aios.path.isfile(file) and await aios.access(file, R_OK)
 
 
 TNonDDCDisplay = TypeVar("TNonDDCDisplay", bound=NonDDCDisplay)

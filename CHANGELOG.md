@@ -1,7 +1,9 @@
 ## 0.0.10 (unreleased)
 ----------------------
 
-- Nothing changed yet.
+- raise exception if `max_brightness_f` is not readable
+- add note in readme to ensure internal display's device file's group
+  is changed to `video`, and the user running the daemon is included in same group
 
 
 ## 0.0.9 (2026-03-26)

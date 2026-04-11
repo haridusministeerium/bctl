@@ -12,6 +12,19 @@ and a client to send commands to the daemon.
 > This will install the client & daemon executables, but it's user responsibility
 to launch the daemon process, covered [below](#daemon).
 
+To be able to change the brightness of a laptop display, you need to
+- create a udev rule that changes the permissions of the internal display
+  brightess device file so users in `video` group are allowed to modify it;
+- make sure your user is included in said group.
+
+E.g. the author uses following rule (from [this superuser answer](https://superuser.com/a/1393488)),
+defined in `/etc/udev/rules.d/20-backlight.rules`:
+```
+ACTION=="add", SUBSYSTEM=="backlight", \
+  RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", \
+  RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
+```
+
 ## Features
 
 - control all displays, optionally blacklisting either class of screens or
