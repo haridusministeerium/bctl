@@ -1,4 +1,4 @@
-## 0.0.10 (unreleased)
+## 0.0.10 (2026-04-11)
 ----------------------
 
 - raise exception if `max_brightness_f` is not readable
