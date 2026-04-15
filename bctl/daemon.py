@@ -299,7 +299,7 @@ async def process_client_commands(err_event: Event) -> None:
     async def wrapped_client_connected_cb(*args):
         try:
             return await process_client_command(*args)
-        except ConnectionResetError as error:
+        except ConnectionResetError:
             pass  # e.g. if client process is terminated during communication
         except Exception as error:
             err_event.err = error

@@ -1,7 +1,10 @@
 ## 0.0.11 (unreleased)
 ----------------------
 
-- Nothing changed yet.
+- fix common.wait_and_reraise() -- exception is now thrown on timeout;
+  also unfinished tasks' cancellation is awaited on
+- readme: mention user needs to be in `video` group, and display device
+  brightness file must be writable by said group
 
 
 ## 0.0.10 (2026-04-11)

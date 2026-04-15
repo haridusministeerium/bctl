@@ -57,13 +57,13 @@ bctld = "bctl.bin.main_daemon:main"
 # from https://bernat.tech/posts/securing-python-supply-chain/#catch-these-with-ruff
 [tool.ruff]
 line-length = 120
-lint.select = ["ALL"]
-lint.ignore = [
-  "COM812", # conflicts with formatter
-  "CPY",    # no copyright
-  "D",      # pydocstyle: enable later for public APIs if publishing a library
-  "ISC001", # conflicts with formatter
-]
+#lint.select = ["ALL"]
+#lint.ignore = [
+  #"COM812", # conflicts with formatter
+  #"CPY",    # no copyright
+  #"D",      # pydocstyle: enable later for public APIs if publishing a library
+  #"ISC001", # conflicts with formatter
+#]
 
 [tool.zest-releaser]
 extra-message = "[skip ci]"
