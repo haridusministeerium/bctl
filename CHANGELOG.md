@@ -1,4 +1,4 @@
-## 0.0.11 (unreleased)
+## 0.0.11 (2026-04-15)
 ----------------------
 
 - fix common.wait_and_reraise() -- exception is now thrown on timeout;
