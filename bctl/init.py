@@ -102,8 +102,6 @@ async def resolve_displays(conf: Conf) -> Sequence[Display]:
 
 
 async def init_displays_sim(conf: Conf) -> Sequence[Display]:
-    global DISPLAYS
-
     ndisplays: int = conf.sim.ndisplays
 
     LOGGER.debug(f"initing {ndisplays} simulated displays...")

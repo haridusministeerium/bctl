@@ -73,7 +73,7 @@ class Display(ABC):
 
         # hydrate eoffset config from state;
         # has to be invoked _after_ we've resolved display offset above!
-        if (o_state := self.conf.state.offsets.get(self.id, None)):
+        if o_state := self.conf.state.offsets.get(self.id, None):
             if self.offset == o_state[0]:
                 self.eoffset = o_state[1]
             elif self.offset == 0:
@@ -156,7 +156,7 @@ class Display(ABC):
         self.logger.debug("getting brightness...")
         return self._get_brightness(raw, no_offset_normalized)
 
-    def get_brightness_opts(self, opts: Opts | int) -> int:
+    def get_brightness_for_opts(self, opts: Opts | int) -> int:
         self.logger.debug("getting brightness...")
         return self._get_brightness(opts & Opts.GET_RAW,
                                     opts & Opts.GET_NO_OFFSET_NORMALIZED)

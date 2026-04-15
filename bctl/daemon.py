@@ -93,7 +93,7 @@ async def init_displays() -> None:
 
 
 async def sync_displays(opts=0) -> None:
-    displays = list(filter(get_disp_filter(opts), DISPLAYS)) if opts else DISPLAYS
+    displays: Sequence[Display] = list(filter(get_disp_filter(opts), DISPLAYS)) if opts else DISPLAYS
     if len(displays) <= 1:
         return
     values: list[int] = sorted(d.get_brightness() for d in displays)
@@ -116,16 +116,16 @@ async def sync_displays(opts=0) -> None:
                     target = max(values)
                     break
                 case "internal":
-                    if (d := next((d for d in displays if d.type is DisplayType.INTERNAL), None)):
+                    if d := next((d for d in displays if d.type is DisplayType.INTERNAL), None):
                         break
                 case "external":
-                    if (d := next((d for d in displays if d.type is DisplayType.EXTERNAL), None)):
+                    if d := next((d for d in displays if d.type is DisplayType.EXTERNAL), None):
                         break
                 case _:
                     prefix = "id:"
                     if strat.startswith(prefix):
                         name = strat[len(prefix):]
-                        if (d := next((d for d in displays if name in d.names), None)):
+                        if d := next((d for d in displays if name in d.names), None):
                             break
                     else:
                         raise FatalErr(
@@ -174,10 +174,10 @@ async def execute_tasks(tasks: list[list]) -> None:
             case ["delta", d]:  # change brightness by delta %
                 delta += d
             case ["up", v]:  # None | int>0
-                v = v if v is not None else CONF.brightness_step
+                v = CONF.brightness_step if v is None else v
                 delta += v
             case ["down", v]:  # None | int>0
-                v = v if v is not None else CONF.brightness_step
+                v = CONF.brightness_step if v is None else v
                 delta -= v
             case ["set", opts, target]:  # set brightness to a % value
                 delta = 0  # cancel all previous deltas
@@ -198,6 +198,8 @@ async def execute_tasks(tasks: list[list]) -> None:
                 sync = True
             case ["kill"]:
                 sys.exit(0)
+            case ["kill", code]:
+                sys.exit(code)
             case _:
                 LOGGER.error(f"unexpected task {t}")
 
@@ -290,7 +292,7 @@ def handle_failure_after_retries(e: Exception):
 async def process_client_commands(err_event: Event) -> None:
     init_displays_retry_handler = get_retry(2, 0.3, True)
     init_displays_retry = partial(init_displays_retry_handler, init_displays)
-    err_payload = [1]
+    err_payload: list[int] = [1]
 
     # this wrapper is so exceptions from serve_forever() callbacks (which are not
     # awaited on) get propagated up to our taskgroup.
@@ -310,7 +312,7 @@ async def process_client_commands(err_event: Event) -> None:
         payload_creator: Callable[
             [list[Task[T]], list[Display]], list[int | str]
         ] = lambda *_: [0],
-    ):
+    ) -> list[int | str]:
         futures, displays = await display_op(op, disp_filter)
         return payload_creator(futures, displays)
 
@@ -321,7 +323,7 @@ async def process_client_commands(err_event: Event) -> None:
             writer.close()
             await writer.wait_closed()
 
-        async def _send_response(payload: list) -> None:
+        async def _send_response(payload: Sequence[int | str | Sequence[int|str]]) -> None:
             response = json.dumps(payload, separators=(",", ":"))
             LOGGER.debug(f"responding: {response}")
             writer.write(response.encode())
@@ -333,7 +335,7 @@ async def process_client_commands(err_event: Event) -> None:
             return
         data = json.loads(data)
         LOGGER.debug(f"received task {data} from client")
-        payload = err_payload
+        payload: Sequence[int | str | Sequence[int|str]] = err_payload
         match data:
             case ["get"]:
                 async with LOCK:
@@ -393,7 +395,7 @@ async def process_client_commands(err_event: Event) -> None:
                             *[
                                 [
                                     d.id,
-                                    d.get_brightness_opts(opts),
+                                    d.get_brightness_for_opts(opts),
                                 ]
                                 for d in displays
                             ],
@@ -412,7 +414,7 @@ async def process_client_commands(err_event: Event) -> None:
                             *[
                                 [
                                     d.id,
-                                    d.get_brightness_opts(opts),
+                                    d.get_brightness_for_opts(opts),
                                 ]
                                 for d in displays
                             ],
@@ -479,11 +481,11 @@ def get_brightness(opts, display_names) -> tuple[int] | list[tuple[str, int]]:
     if not displays:
         return []
     elif opts & Opts.GET_ALL or display_names:
-        # return [f'{d.id},{d.get_brightness_opts(opts)}' for d in displays]
+        # return [f'{d.id},{d.get_brightness_for_opts(opts)}' for d in displays]
         return [
             (
                 d.id,
-                d.get_brightness_opts(opts),
+                d.get_brightness_for_opts(opts),
             )
             for d in displays
         ]

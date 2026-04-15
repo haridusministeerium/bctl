@@ -22,8 +22,7 @@ async def iter_monitor_devices(
         while True:
             await read_event.wait()
             while True:
-                device: Device | None = monitor.poll(0)
-                if device:
+                if device := monitor.poll(0):
                     yield device
                 else:
                     read_event.clear()

@@ -4,3 +4,6 @@
 [env]
 #_.python.venv = { path = ".venv", create = true, python = "3.10" } # use a specific python version
 _.python.venv = { path = ".venv", create = true }
+
+# Use the project name derived from the current directory
+PROJECT_NAME = "{{ config_root | basename }}"
