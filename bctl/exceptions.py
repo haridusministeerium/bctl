@@ -1,26 +1,32 @@
-class FatalErr(Exception):
-    def __init__(self, message) -> None:
+class NotifyAwareErr(Exception):
+    def __init__(self, message, notify: bool = True) -> None:
         super().__init__(message)
+        self.notify: bool = notify
 
 
-class RetriableException(Exception):
+class FatalErr(NotifyAwareErr):
     pass
 
 
-class ExitableErr(RetriableException):
-    def __init__(self, message, exit_code: int = 1) -> None:
-        super().__init__(message)
+class RetriableErr(Exception):
+    pass
+
+
+class ExitableErr(NotifyAwareErr, RetriableErr):
+    def __init__(self, message, exit_code: int = 1, notify: bool = True) -> None:
+        super().__init__(message, notify=notify)
         self.exit_code: int = exit_code
 
 
-class PayloadErr(RetriableException):
+class PayloadErr(RetriableErr):
     def __init__(self, message, payload: list) -> None:
         super().__init__(message)
         self.payload = payload
 
 
-class CmdErr(RetriableException):
+class CmdErr(RetriableErr):
     def __init__(self, message, code: int | None, stderr: str) -> None:
         super().__init__(message)
-        self.code = code
-        self.stderr = stderr
+        self.code: int | None = code
+        self.stderr: str = stderr
+

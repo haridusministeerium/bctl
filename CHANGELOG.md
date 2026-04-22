@@ -1,7 +1,11 @@
 ## 0.0.12 (unreleased)
 ----------------------
 
-- Nothing changed yet.
+- client: add --version flag
+- add NotifyAwareErr - allows us to raise errors that won't
+  generate desktop notifications
+- do not display desktop notification when our asyncio tasks time out
+  on execution (see above)
 
 
 ## 0.0.11 (2026-04-15)

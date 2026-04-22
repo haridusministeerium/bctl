@@ -47,6 +47,7 @@ def pack_opts(
 @click.group
 @click.pass_context
 @click.option("--debug", is_flag=True, help="log at debug level")
+@click.version_option()
 def main(ctx, debug: bool):
     """Client for sending messages to BCTLD"""
     ctx.obj = client.Client(debug=debug)
@@ -358,13 +359,15 @@ def sync(ctx):
 
 @main.command
 @click.pass_obj
-def kill(ctx):
+@click.argument("code", type=int, default=0)
+def kill(ctx, code):
     """Terminate the daemon process.
 
     :param ctx: context
     """
-    ctx.send_cmd(["kill"])
+    ctx.send_cmd(["kill", code])
 
 
 if __name__ == "__main__":
     main()
+

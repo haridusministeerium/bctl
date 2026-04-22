@@ -21,6 +21,7 @@ from bctl.config import SimConf
 @click.option("-b", "--brightness", help="Initial brightness", default=50)
 @click.option("-f", "--fail", type=str, help="Failure mode to simulate")
 @click.option("-e", "--exit", default=1, help="code to exit chosen failmode with")
+@click.version_option()
 def main(
     debug: bool,
     state: bool,

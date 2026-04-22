@@ -4,7 +4,7 @@ import shutil
 from collections.abc import Sequence, Iterable
 from enum import IntFlag
 from logging import Logger
-from bctl.exceptions import FatalErr, CmdErr
+from bctl.exceptions import FatalErr, CmdErr, ExitableErr
 
 
 class Opts(IntFlag):
@@ -91,5 +91,6 @@ async def wait_and_reraise(tasks: Sequence[asyncio.Task]) -> None:
             raise exc
 
     if len(done) < len(tasks):
-        raise asyncio.TimeoutError("Tasks timed out before completion or exception.")
+        raise ExitableErr(f"{len(tasks) - len(done)} / {len(tasks)} tasks timed out before completion or exception",
+                          notify=False)
 

@@ -5,6 +5,7 @@ import sys
 import json
 import logging
 from functools import partial
+from pydantic.types import PositiveInt
 from retry_deco import RetryAsync, OnErrOpts
 from logging import Logger
 from types import TracebackType
@@ -37,7 +38,7 @@ from bctl.exceptions import (
     ExitableErr,
     FatalErr,
     PayloadErr,
-    RetriableException,
+    RetriableErr,
 )
 from bctl.notify import Notif
 
@@ -57,7 +58,7 @@ def get_retry(
     on_exception=None,
 ) -> RetryAsync:
     return RetryAsync(
-        RetriableException,
+        RetriableErr,
         retries=retries,
         backoff=sleep,
         on_exhaustion=on_exhaustion,
@@ -68,7 +69,7 @@ NO_RETRY_NO_THROW: RetryAsync = get_retry(0, 0, on_exhaustion=True)
 
 
 def validate_ext_deps() -> None:
-    requirements = [CONF.main_display_ctl, CONF.internal_display_ctl]
+    requirements: list[str] = [CONF.main_display_ctl, CONF.internal_display_ctl]
     for dep in ["ddcutil", "brillo", "brightnessctl"]:
         if dep in requirements:
             assert_cmd_exist(dep)
@@ -174,15 +175,15 @@ async def execute_tasks(tasks: list[list]) -> None:
             case ["delta", d]:  # change brightness by delta %
                 delta += d
             case ["up", v]:  # None | int>0
-                v = CONF.brightness_step if v is None else v
+                v: PositiveInt = CONF.brightness_step if v is None else v
                 delta += v
             case ["down", v]:  # None | int>0
-                v = CONF.brightness_step if v is None else v
+                v: PositiveInt = CONF.brightness_step if v is None else v
                 delta -= v
             case ["set", opts, target]:  # set brightness to a % value
-                delta = 0  # cancel all previous deltas
+                delta = 0  # cancel any previous deltas
             case ["set", target]:  # set brightness to a % value
-                delta = 0  # cancel all previous deltas
+                delta = 0  # cancel any previous deltas
             # case ['setmon', display_id, value]:
                 # d = next((d for d in DISPLAYS if display_id in d.names), None)
                 # if d:
@@ -213,7 +214,7 @@ async def execute_tasks(tasks: list[list]) -> None:
         target += delta
         # futures = [asyncio.create_task(d.set_brightness(target)) for d in DISPLAYS]
         r = RetryAsync(
-            RetriableException,
+            RetriableErr,
             retries=1,
             on_exception=(init_displays, OnErrOpts.RUN_ON_LAST_TRY),
         )  # note setting absolute value is retriable
@@ -221,7 +222,7 @@ async def execute_tasks(tasks: list[list]) -> None:
     elif delta != 0:
         # futures = [asyncio.create_task(d.adjust_brightness(delta)) for d in DISPLAYS]
         r = RetryAsync(
-            RetriableException,
+            RetriableErr,
             retries=0,
             on_exception=(init_displays, OnErrOpts.RUN_ON_LAST_TRY),
         )
@@ -262,7 +263,7 @@ async def post_set(futures: Task[int], opts) -> None:
     if not opts & Opts.NO_TRACK and (brightnesses[-1] - brightnesses[0]) <= 1:
         CONF.state.last_set_brightness = brightnesses[0]
     if not opts & Opts.NO_NOTIFY:
-        await NOTIF.notify_change(brightnesses[0])  # TODO: shouldn't we consolidate the value?
+        await NOTIF.notify_change(brightnesses[0])  # TODO: shouldn't we consolidate the value? perhaps using CONF.get_strategy
     if CONF.sync_brightness and not opts & Opts.NO_SYNC:
         await sync_displays(opts)
 
@@ -339,11 +340,11 @@ async def process_client_commands(err_event: Event) -> None:
         match data:
             case ["get"]:
                 async with LOCK:
-                    with suppress(RetriableException):
+                    with suppress(RetriableErr):
                         payload = [0, *get_brightness(0, False)]
             case ["get", opts, displays]:
                 async with LOCK:
-                    with suppress(RetriableException):
+                    with suppress(RetriableErr):
                         payload = [0, *get_brightness(opts, displays)]
             case ["setvcp", retry, sleep, displays, params]:
                 r = get_retry(
@@ -378,7 +379,7 @@ async def process_client_commands(err_event: Event) -> None:
             case ["set_get_for", retry, sleep, opts, disp_to_brightness]:
                 r = get_retry(retry, sleep, on_exception=init_displays_retry)
                 async with LOCK:
-                    with suppress(RetriableException):
+                    with suppress(RetriableErr):
                         futures, displays = await r(
                             display_op,
                             lambda d: d.set_brightness(
@@ -403,7 +404,7 @@ async def process_client_commands(err_event: Event) -> None:
             case ["set_get", retry, sleep, opts, value]:
                 r = get_retry(retry, sleep, on_exception=init_displays_retry)
                 async with LOCK:
-                    with suppress(RetriableException):
+                    with suppress(RetriableErr):
                         futures, displays = await r(
                             display_op,
                             lambda d: d.set_brightness(value),
@@ -447,14 +448,14 @@ async def process_client_commands(err_event: Event) -> None:
     await server.serve_forever()
 
 
-async def delta_brightness(delta: int):
+async def delta_brightness(delta: int) -> None:
     LOGGER.debug(
         f"placing brightness change in queue for delta {'+' if delta > 0 else ''}{delta}"
     )
     await TASK_QUEUE.put(["delta", delta])
 
 
-async def terminate():
+async def terminate() -> None:
     LOGGER.info("placing termination request in queue")
     await TASK_QUEUE.put(["kill"])
     # alternatively, ignore existing queue and terminate immediately:
@@ -569,7 +570,8 @@ async def run() -> None:
             exit_code: int = CONF.fatal_exit_code
         LOGGER.debug(ee, stack_info=True, exc_info=True)
         LOGGER.debug(f"{type(ee).__name__} caught, exiting with code {exit_code}...")
-        await NOTIF.notify_err(ee)
+        if ee.notify:
+            await NOTIF.notify_err(ee)
         sys.exit(exit_code)
     except* SystemExit:
         raise
@@ -617,3 +619,4 @@ def main(debug: bool, load_state: bool, sim_conf: SimConf | None = None) -> None
     logging.basicConfig(stream=sys.stdout, level=log_lvl, force=True)
 
     asyncio.run(run())
+

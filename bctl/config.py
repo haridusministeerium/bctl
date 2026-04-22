@@ -9,8 +9,8 @@ from collections.abc import Iterable
 from pydash import py_
 from datetime import datetime
 from logging import Logger
-from pydantic import (
-    BaseModel,
+from pydantic import BaseModel
+from pydantic.types import (
     PositiveInt,
     NonNegativeInt,
     PositiveFloat,
