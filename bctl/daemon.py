@@ -149,9 +149,10 @@ async def sync_displays(opts=0) -> None:
 
 async def display_op[T](
     op: Callable[[Display], Coroutine[Any, Any, T]],
-    disp_filter: Callable[[Display], bool] = lambda _: True,
-) -> tuple[list[Task[T]], list[Display]]:
-    displays = list(filter(disp_filter, DISPLAYS))
+    disp_filter: Callable[[Display], bool] | None = None,
+) -> tuple[list[T], Sequence[Display]]:
+    # displays = [*DISPLAYS] if disp_filter is None else list(filter(disp_filter, DISPLAYS))
+    displays = DISPLAYS if disp_filter is None else list(filter(disp_filter, DISPLAYS))
     if not displays:
         raise PayloadErr(
             "no displays for given filter found",
@@ -159,7 +160,7 @@ async def display_op[T](
         )
     futures: list[Task[T]] = [asyncio.create_task(op(d)) for d in displays]
     await wait_and_reraise(futures)
-    return futures, displays
+    return [f.result() for f in futures], displays
 
 
 async def execute_tasks(tasks: list[list]) -> None:
@@ -234,7 +235,7 @@ async def execute_tasks(tasks: list[list]) -> None:
     number_tasks = f"{len(tasks)} task{'' if len(tasks) == 1 else 's'}"
     LOGGER.debug(f"about to execute() {number_tasks}...")
     try:
-        futures, _ = await r(display_op, f, get_disp_filter(opts))
+        brightnesses, _ = await r(display_op, f, get_disp_filter(opts))
         LOGGER.debug(f"...executed {number_tasks}")
     except Exception as e:
         LOGGER.error(f"...error executing tasks: {e}")
@@ -255,11 +256,11 @@ async def execute_tasks(tasks: list[list]) -> None:
         # return
     #}
 
-    await post_set(futures, opts)
+    await post_set(brightnesses, opts)
 
 
-async def post_set(futures: Task[int], opts) -> None:
-    brightnesses: list[int] = sorted(f.result() for f in futures)
+async def post_set(brightnesses: list[int], opts) -> None:
+    brightnesses = sorted(brightnesses)
     if not opts & Opts.NO_TRACK and (brightnesses[-1] - brightnesses[0]) <= 1:
         CONF.state.last_set_brightness = brightnesses[0]
     if not opts & Opts.NO_NOTIFY:
@@ -311,11 +312,11 @@ async def process_client_commands(err_event: Event) -> None:
         op: Callable[[Display], Coroutine[Any, Any, T]],
         disp_filter: Callable[[Display], bool],
         payload_creator: Callable[
-            [list[Task[T]], list[Display]], list[int | str]
-        ] = lambda *_: [0],
+            [list[T], Sequence[Display]], list[int | str]
+        ] | None = None,
     ) -> list[int | str]:
-        futures, displays = await display_op(op, disp_filter)
-        return payload_creator(futures, displays)
+        results, displays = await display_op(op, disp_filter)
+        return [0] if payload_creator is None else payload_creator(results, displays)
 
     async def process_client_command(reader, writer) -> None:
         async def _close_socket() -> None:
@@ -368,11 +369,11 @@ async def process_client_commands(err_event: Event) -> None:
                         lambda d: d._get_vcp_feature(params),
                         lambda d: d.backend is BackendType.DDCUTIL
                         and (any(x in d.names for x in displays) if displays else True),
-                        lambda futures, displays: [
+                        lambda results, displays: [
                             0,
                             *[
-                                [displays[i].id, f.result().strip()]
-                                for i, f in enumerate(futures)
+                                [displays[i].id, r.strip()]
+                                for i, r in enumerate(results)
                             ],
                         ],
                     )
@@ -380,7 +381,7 @@ async def process_client_commands(err_event: Event) -> None:
                 r = get_retry(retry, sleep, on_exception=init_displays_retry)
                 async with LOCK:
                     with suppress(RetriableErr):
-                        futures, displays = await r(
+                        _, displays = await r(
                             display_op,
                             lambda d: d.set_brightness(
                                 next(
@@ -405,11 +406,11 @@ async def process_client_commands(err_event: Event) -> None:
                 r = get_retry(retry, sleep, on_exception=init_displays_retry)
                 async with LOCK:
                     with suppress(RetriableErr):
-                        futures, displays = await r(
+                        brightnesses, displays = await r(
                             display_op,
                             lambda d: d.set_brightness(value),
                         )
-                        await post_set(futures, opts)
+                        await post_set(brightnesses, opts)
                         payload = [
                             0,
                             *[
