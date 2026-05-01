@@ -124,14 +124,13 @@ async def sync_displays(opts=0) -> None:
                         break
                 case _:
                     prefix = "id:"
-                    if strat.startswith(prefix):
-                        name = strat[len(prefix):]
-                        if d := next((d for d in displays if name in d.names), None):
-                            break
-                    else:
+                    if not strat.startswith(prefix):
                         raise FatalErr(
                             f"misconfigured brightness sync strategy [{strat}]"
                         )
+                    name = strat[len(prefix):]
+                    if d := next((d for d in displays if name in d.names), None):
+                        break
 
         if d is not None:
             target = d.get_brightness()

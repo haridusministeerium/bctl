@@ -193,15 +193,14 @@ $ socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/bctl/bctld-ipc.sock <<< '["get"]' | jq -
 Likewise, for setting brightness you might define a bash/zsh function similar to:
 
 ```sh
-# Sets the screens' brightness level
+# Set the screens' brightness level
 #
-# @param {digit|string}   percentage to set the brightness level to (without the percentage sign).
-#                         may also prefix with + or - if delta change is wanted.
+# @param {digit|string}   percentage to set the brightness level to. may also
+#                         be prefixed with + or - if delta change is wanted.
 # @returns {void}
 set_brightness() {
-    local msg
+    local msg="${1%\%*}"  # strip trailing % if it was (mistakenly) given
 
-    msg="${1%\%*}"  # strip trailing % if it was (mistakenly) given
     if [[ "$msg" =~ ^[0-9]{1,3}$ ]]; then
         msg="[\"set\",$msg]"
     elif [[ "$msg" =~ ^[-+][0-9]{1,3}$ ]]; then
@@ -217,8 +216,8 @@ set_brightness() {
 ...which is effectively same as `bctl set "$1"`
 
 > [!WARNING]  
-> Please note there will be no guarantees about the stability of this api as it's
-part of internal comms spec.
+> Please note there will be no guarantees about the stability of this api as
+it's part of internal comms spec.
 
 ## Configuration
 
