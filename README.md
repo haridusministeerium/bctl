@@ -308,6 +308,7 @@ re-initialize its state by sending init command via the client: `$ bctl init`
   might lead to endless loop of fighting over control. Guess bctl could be the
   bigger man and not react to changes brought on by other parties.
   note on this to-be backend our own udev monitor should be switched off.
+  - note there's also [ddcutil-varlink](https://github.com/digitaltrails/ddcutil-varlink)
 
 ## See also
 

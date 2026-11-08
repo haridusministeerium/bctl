@@ -1,4 +1,5 @@
 import asyncio
+from asyncio import AbstractEventLoop
 import logging
 from logging import Logger
 from pyudev import Context, Device, Monitor
@@ -16,7 +17,7 @@ async def iter_monitor_devices(
     monitor.start()
     fd: int = monitor.fileno()
     read_event = asyncio.Event()
-    loop = asyncio.get_event_loop()
+    loop: AbstractEventLoop = asyncio.get_running_loop()
     loop.add_reader(fd, read_event.set)
     try:
         while True:

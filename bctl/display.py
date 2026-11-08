@@ -117,7 +117,7 @@ class Display(ABC):
 
     async def set_brightness(self, value: int) -> int:
         # print(f"  orig input value: {value}")
-        orig_value = value
+        orig_value: int = value
         if value < 0:
             value = 0
         elif value > 100:
