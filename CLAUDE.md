@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 The venv is managed by mise (`mise.toml` creates `.venv` via uv).
 
 ```sh
-pip install -e .[dev]        # installs ruff, ty, ipdb
+pip install -e '.[dev]'      # installs ruff, ty, ipdb
 ruff check bctl              # lint (line-length 120)
 ty check bctl                # type check
 bctld --debug                # run real daemon
@@ -27,7 +27,10 @@ Releases use zest.releaser (`CHANGELOG.md` in md format, no PyPI upload from rel
 ## Architecture
 
 **Daemon (`bctl/daemon.py`)** uses module-level globals (`DISPLAYS`, `TASK_QUEUE`, `LOCK`, `CONF`, `NOTIF`) initialised in `main()`. `run()` starts an `asyncio.TaskGroup` with:
-- `process_client_commands` – unix socket server. Each connection sends one JSON array (e.g. `["get"]`, `["set", opts, 50]`). Fire-and-forget commands (`up`/`down`/`delta`/`set`/`init`/`sync`/`kill`) are put on `TASK_QUEUE`; request/response commands (`get`, `set_get`, `set_get_for`, `set_for_async`, `setvcp`, `getvcp`) are handled inline under `LOCK` and reply with `[code, *payload]`.
+- `process_client_commands` – unix socket server. Each connection sends one JSON array (e.g. `["get"]`, `["set", opts, 50]`); most commands have several arities (e.g. `["kill"]` / `["kill", code]`, `["get"]` / `["get", opts, displays]`), so treat the `match` cases in `daemon.py` and `execute_tasks` as the authoritative list.
+  - Queued, no reply: `up`, `down`, `delta`, `set`, `init`, `sync`, `kill` go onto `TASK_QUEUE`.
+  - Inline under `LOCK`, reply with `[code, *payload]`: `get`, `set_get`, `set_get_for`, `setvcp`, `getvcp`.
+  - `set_for_async` closes the socket immediately (no reply), then sets per-display brightness inline under `LOCK`.
 - `process_q` – batches queue items arriving within `msg_consumption_window_sec` and hands them to `execute_tasks`, which coalesces them (deltas summed, a `set` cancels prior deltas) into a single display operation. This is why spamming a key runs ddcutil only once.
 - udev `drm change` monitor (debounced) and optional `periodic_init`, both enqueue `["init", retry, sleep]`.
 - signal handlers: SIGUSR1/SIGUSR2 bump brightness, SIGINT/SIGTERM terminate. State (`State`: last set brightness, offsets) is persisted to the cache dir in `finally` and rehydrated on start.

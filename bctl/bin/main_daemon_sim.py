@@ -34,7 +34,7 @@ def main(
     failmodes = ["i", "s"]
     assert number > 0, "number of simulated displays must be positive"
     assert fail in failmodes + [None], f"allowed failmodes are {failmodes}"
-    assert number >= 0, "exit code needs to be >= 0"
+    assert exit >= 0, "exit code needs to be >= 0"
 
     sim: SimConf = SimConf.model_validate(
         {
