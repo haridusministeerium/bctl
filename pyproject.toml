@@ -42,6 +42,10 @@ dev = [
     "ty", # checking types
     "ipdb", # debugging
 ]
+test = [
+    "pytest",
+    "pytest-asyncio",
+]
 
 [build-system]
 requires = [
@@ -55,6 +59,11 @@ bctl = "bctl.bin.main_client:main"
 bctld = "bctl.bin.main_daemon:main"
 
 # from https://bernat.tech/posts/securing-python-supply-chain/#catch-these-with-ruff
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
 [tool.ruff]
 line-length = 120
 #lint.select = ["ALL"]

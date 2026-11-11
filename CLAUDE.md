@@ -11,16 +11,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 The venv is managed by mise (`mise.toml` creates `.venv` via uv).
 
 ```sh
-pip install -e '.[dev]'      # installs ruff, ty, ipdb
-ruff check bctl              # lint (line-length 120)
+pip install -e '.[dev,test]' # installs ruff, ty, ipdb, pytest, pytest-asyncio
+ruff check bctl tests        # lint (line-length 120)
 ty check bctl                # type check
+pytest                       # run all tests
+pytest tests/test_display.py::TestOffsets::test_hard_positive_offset  # single test
 bctld --debug                # run real daemon
 bctlsim --debug -w 0.2 -n 3  # run daemon against simulated displays (no hardware needed)
 bctlsim -w 0.2 -f s -e 1     # simulate failures: -f i (init) | s (set), -e exit code
 bctl --help                  # client; e.g. `bctl get`, `bctl set 50`, `bctl init`
 ```
 
-There is no test suite; `bctlsim` (`bctl/bin/main_daemon_sim.py` → `SimulatedDisplay`) is the way to exercise daemon logic without displays. Only one daemon instance can run at a time (`tendo.singleton`).
+Tests need no hardware, external binaries or dbus.
+- `tests/conftest.py` redirects the `XDG_*` dirs to a temp dir before importing `bctl`, because `bctl.common` resolves the socket and cache paths at import time.
+- It also provides `FakeDisplay`, an in-memory `Display` that records raw writes, plus `FakeNotif`.
+- Daemon tests monkeypatch the module globals in `bctl.daemon` (`CONF`, `DISPLAYS`, `TASK_QUEUE`, `LOCK`, `NOTIF`, `init_displays`).
+- External commands are faked by monkeypatching `run_cmd` in the module under test.
+- pytest-asyncio runs in auto mode, so `async def test_*` needs no marker.
+
+For manual end-to-end checks, `bctlsim` (`bctl/bin/main_daemon_sim.py` → `SimulatedDisplay`) runs the daemon without real displays. Only one daemon instance can run at a time (`tendo.singleton`).
 
 Releases use zest.releaser (`CHANGELOG.md` in md format, no PyPI upload from release step; CI in `.github/workflows/build-release.yml` delegates to a shared workflow). Add user-visible changes to the top "unreleased" section of `CHANGELOG.md`.
 
