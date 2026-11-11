@@ -3,14 +3,14 @@ from asyncio import AbstractEventLoop
 import logging
 from logging import Logger
 from pyudev import Context, Device, Monitor
-from typing import AsyncGenerator, Awaitable, Callable
+from typing import Any, AsyncGenerator, Awaitable, Callable
 
 LOGGER: Logger = logging.getLogger(__name__)
 
 
 # from https://github.com/pyudev/pyudev/issues/450
 async def iter_monitor_devices(
-    context: Context, **kwargs
+    context: Context, **kwargs: str
 ) -> AsyncGenerator[Device, None]:
     monitor: Monitor = Monitor.from_netlink(context)
     monitor.filter_by(**kwargs)
@@ -32,7 +32,7 @@ async def iter_monitor_devices(
         loop.remove_reader(fd)
 
 
-async def monitor_udev_events(subsys: str, action: str, f: Callable[[], Awaitable]):
+async def monitor_udev_events(subsys: str, action: str, f: Callable[[], Awaitable[Any]]) -> None:
     context = Context()
     async for device in iter_monitor_devices(context, subsystem=subsys):
         if device.action == action:

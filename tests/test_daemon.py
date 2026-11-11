@@ -227,7 +227,8 @@ async def test_process_q_batches_within_consumption_window(env, monkeypatch):
 class TestSocketProtocol:
     @pytest.fixture
     async def server(self, env):
-        task = asyncio.create_task(daemon.process_client_commands(asyncio.Event()))
+        err_fut = asyncio.get_running_loop().create_future()
+        task = asyncio.create_task(daemon.process_client_commands(err_fut))
         for _ in range(100):
             if os.path.exists(SOCKET_PATH):
                 break

@@ -102,6 +102,7 @@ async def resolve_displays(conf: Conf) -> Sequence[Display]:
 
 
 async def init_displays_sim(conf: Conf) -> Sequence[Display]:
+    assert conf.sim is not None, "simulated displays require sim config"
     ndisplays: int = conf.sim.ndisplays
 
     LOGGER.debug(f"initing {ndisplays} simulated displays...")

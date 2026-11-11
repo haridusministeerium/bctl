@@ -48,7 +48,7 @@ def pack_opts(
 @click.pass_context
 @click.option("--debug", is_flag=True, help="log at debug level")
 @click.version_option()
-def main(ctx, debug: bool):
+def main(ctx: click.Context, debug: bool) -> None:
     """Client for sending messages to BCTLD"""
     ctx.obj = client.Client(debug=debug)
 
@@ -56,7 +56,7 @@ def main(ctx, debug: bool):
 @main.command
 @click.pass_obj
 @click.argument("delta", type=int, required=False)
-def up(ctx, delta):
+def up(ctx: client.Client, delta: int | None) -> None:
     """Bump up screens' brightness.
 
     :param ctx: context
@@ -71,7 +71,7 @@ def up(ctx, delta):
 @main.command
 @click.pass_obj
 @click.argument("delta", type=int, required=False)
-def down(ctx, delta):
+def down(ctx: client.Client, delta: int | None) -> None:
     """Bump down screens' brightness.
 
     :param ctx: context
@@ -94,14 +94,14 @@ def down(ctx, delta):
 )
 @click.argument("delta", type=int)
 def delta(
-    ctx,
+    ctx: client.Client,
     no_notify: bool,
     no_track: bool,
     no_external: bool,
     no_internal: bool,
     no_sync: bool,
     delta: int,
-):
+) -> None:
     """Change screens' brightness by given %
 
     :param ctx: context
@@ -134,14 +134,14 @@ def delta(
 )
 @click.argument("args", nargs=-1, type=str)
 def set(
-    ctx,
+    ctx: client.Client,
     no_notify: bool,
     no_track: bool,
     no_external: bool,
     no_internal: bool,
     no_sync: bool,
     args: tuple[str, ...],
-):
+) -> None:
     """Change screens' brightness to/by given %
 
     :param ctx: context
@@ -190,8 +190,12 @@ def set(
 @click.option("--display", "-d", multiple=True, type=str)
 @click.argument("args", nargs=-1, type=str)
 def setvcp(
-    ctx, retry: int, sleep: float | int, display: tuple[str, ...], args: tuple[str, ...]
-):
+    ctx: client.Client,
+    retry: int,
+    sleep: float | int,
+    display: tuple[str, ...],
+    args: tuple[str, ...],
+) -> None:
     """Set VCP feature value(s) for all detected DDC displays
 
     :param ctx: context
@@ -221,7 +225,7 @@ def setvcp(
 @click.option("-r", "--raw", is_flag=True, help="retrieve raw brightness value")
 @click.argument("args", nargs=-1, type=str)
 def set_get(
-    ctx,
+    ctx: client.Client,
     retry: int,
     sleep: float | int,
     no_notify: bool,
@@ -230,7 +234,7 @@ def set_get(
     no_offset: bool,
     raw: bool,
     args: tuple[str, ...],
-):
+) -> None:
     """similar to multi-argument set(), but synchronized, and returns new brighnesses
        of all the displays that the change operated on.
 
@@ -275,8 +279,12 @@ def set_get(
 @click.option("--display", "-d", multiple=True, type=str)
 @click.argument("args", nargs=-1, type=str)
 def getvcp(
-    ctx, retry: int, sleep: float | int, display: tuple[str, ...], args: tuple[str, ...]
-):
+    ctx: client.Client,
+    retry: int,
+    sleep: float | int,
+    display: tuple[str, ...],
+    args: tuple[str, ...],
+) -> None:
     """Get VCP feature value(s) for all detected DDC displays
 
     :param ctx: context
@@ -300,14 +308,14 @@ def getvcp(
 )
 @click.argument("displays", nargs=-1, type=str)
 def get(
-    ctx,
+    ctx: client.Client,
     all: bool,
     raw: bool,
     no_external: bool,
     no_internal: bool,
     no_offset: bool,
     displays: tuple[str, ...],
-):
+) -> None:
     """Get screens' brightness (%)
 
     :param ctx: context
@@ -339,7 +347,7 @@ def get(
 @click.option(
     "-s", "--sleep", default=0.5, help="how many seconds to sleep between retries"
 )
-def init(ctx, retry: int, sleep: float | int):
+def init(ctx: client.Client, retry: int, sleep: float | int) -> None:
     """Re-initialize displays.
 
     :param ctx: context
@@ -349,7 +357,7 @@ def init(ctx, retry: int, sleep: float | int):
 
 @main.command
 @click.pass_obj
-def sync(ctx):
+def sync(ctx: client.Client) -> None:
     """Synchronize screens' brightness levels, even if disabled in the config.
 
     :param ctx: context
@@ -360,7 +368,7 @@ def sync(ctx):
 @main.command
 @click.pass_obj
 @click.argument("code", type=int, default=0)
-def kill(ctx, code):
+def kill(ctx: client.Client, code: int) -> None:
     """Terminate the daemon process.
 
     :param ctx: context

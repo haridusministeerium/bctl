@@ -10,7 +10,7 @@ import bctl.daemon as daemon
     "--state/--no-state", default=True, help="whether persisted state should be loaded"
 )
 @click.version_option()
-def main(debug: bool, state: bool):
+def main(debug: bool, state: bool) -> None:
     daemon.main(debug, state)
 
 

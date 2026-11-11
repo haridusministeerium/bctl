@@ -2,19 +2,21 @@ import asyncio
 import logging
 import sys
 import json
+from asyncio import StreamReader, StreamWriter
 from logging import Logger
+from typing import Any, NoReturn
 from bctl.common import SOCKET_PATH
 
 
 class Client(object):
     """Client to send commands over socket to the daemon"""
 
-    def __init__(self, debug=False):
+    def __init__(self, debug: bool = False) -> None:
         self.logger: Logger = logging.getLogger(__name__)
         log_lvl = logging.DEBUG if debug else logging.INFO
         logging.basicConfig(stream=sys.stdout, level=log_lvl)
 
-    async def _open_write_socket(self, cmd: list):
+    async def _open_write_socket(self, cmd: list[Any]) -> tuple[StreamReader, StreamWriter]:
         try:
             reader, writer = await asyncio.open_unix_connection(SOCKET_PATH)
         except FileNotFoundError:
@@ -26,12 +28,12 @@ class Client(object):
         writer.write_eof()
         return reader, writer
 
-    async def _close_socket(self, writer):
+    async def _close_socket(self, writer: StreamWriter) -> None:
         self.logger.debug("closing the connection")
         writer.close()
         await writer.wait_closed()
 
-    async def _send_receive(self, cmd: list):
+    async def _send_receive(self, cmd: list[Any]) -> NoReturn:
         reader, writer = await self._open_write_socket(cmd)
 
         data = await reader.read()
@@ -45,12 +47,12 @@ class Client(object):
         await self._close_socket(writer)
         sys.exit(code)
 
-    async def _send(self, cmd: list):
+    async def _send(self, cmd: list[Any]) -> None:
         _, writer = await self._open_write_socket(cmd)
         await self._close_socket(writer)
 
-    def send_cmd(self, cmd):
+    def send_cmd(self, cmd: list[Any]) -> None:
         asyncio.run(self._send(cmd))
 
-    def send_receive_cmd(self, cmd: list):
+    def send_receive_cmd(self, cmd: list[Any]) -> NoReturn:
         asyncio.run(self._send_receive(cmd))

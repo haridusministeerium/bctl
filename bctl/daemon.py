@@ -9,9 +9,9 @@ from pydantic.types import PositiveInt
 from retry_deco import RetryAsync, OnErrOpts
 from logging import Logger
 from types import TracebackType
-from asyncio import AbstractEventLoop, Task, Queue, Lock, Event
+from asyncio import AbstractEventLoop, Task, Queue, Lock, Future, StreamReader, StreamWriter
 from typing import NoReturn, Callable, Coroutine, Any
-from collections.abc import Sequence
+from collections.abc import Awaitable, Sequence
 from tendo import singleton
 from statistics import fmean
 from contextlib import suppress
@@ -37,14 +37,20 @@ from bctl.config import (
 from bctl.exceptions import (
     ExitableErr,
     FatalErr,
+    NotifyAwareErr,
     PayloadErr,
     RetriableErr,
 )
 from bctl.notify import Notif
 
+# RetryAsync.__call__ is annotated as returning Awaitable[Any] from an async def,
+# which would make awaited results Awaitable; this alias reflects the real behaviour
+type RetryFn = Callable[..., Coroutine[Any, Any, Any]]
+
 DISPLAYS: Sequence[Display] = []
-TASK_QUEUE: Queue[list]
+TASK_QUEUE: Queue[list[Any]]
 LOCK: Lock
+SINGLETON_LOCK: singleton.SingleInstance
 CONF: Conf
 LOGGER: Logger = logging.getLogger(__name__)
 NOTIF: Notif
@@ -54,18 +60,21 @@ LAST_INIT_TIME: int = 0
 def get_retry(
     retries: int,
     sleep: float | int,
-    on_exhaustion: bool | Callable = False,
-    on_exception=None,
-) -> RetryAsync:
+    on_exhaustion: bool | Callable[[Exception], Any] = False,
+    on_exception: Callable[..., Awaitable[Any]]
+    | tuple[Callable[..., Awaitable[Any]], OnErrOpts]
+    | None = None,
+) -> RetryFn:
     return RetryAsync(
         RetriableErr,
         retries=retries,
         backoff=sleep,
-        on_exhaustion=on_exhaustion,
+        # retry_deco types this callback as taking the exception class, but invokes it w/ the instance:
+        on_exhaustion=on_exhaustion,  # ty: ignore[invalid-argument-type]
         on_exception=on_exception,
     ).__call__
 
-NO_RETRY_NO_THROW: RetryAsync = get_retry(0, 0, on_exhaustion=True)
+NO_RETRY_NO_THROW: RetryFn = get_retry(0, 0, on_exhaustion=True)
 
 
 def validate_ext_deps() -> None:
@@ -93,7 +102,7 @@ async def init_displays() -> None:
     LAST_INIT_TIME = unix_time_now()
 
 
-async def sync_displays(opts=0) -> None:
+async def sync_displays(opts: Opts | int = 0) -> None:
     displays: Sequence[Display] = list(filter(get_disp_filter(opts), DISPLAYS)) if opts else DISPLAYS
     if len(displays) <= 1:
         return
@@ -165,9 +174,9 @@ async def display_op[T](
 async def execute_tasks(tasks: list[list]) -> None:
     delta: int = 0
     target: int | None = None
-    init_retry: None | RetryAsync = None
+    init_retry: RetryFn | None = None
     sync: bool = False
-    opts = 0
+    opts: Opts | int = 0
     for t in tasks:
         match t:
             case ["delta", opts, d]:  # change brightness by delta %
@@ -213,19 +222,13 @@ async def execute_tasks(tasks: list[list]) -> None:
     if target is not None:
         target += delta
         # futures = [asyncio.create_task(d.set_brightness(target)) for d in DISPLAYS]
-        r = RetryAsync(
-            RetriableErr,
-            retries=1,
-            on_exception=(init_displays, OnErrOpts.RUN_ON_LAST_TRY),
+        r = get_retry(
+            1, 0, on_exception=(init_displays, OnErrOpts.RUN_ON_LAST_TRY)
         )  # note setting absolute value is retriable
         f = lambda d: d.set_brightness(target)
     elif delta != 0:
         # futures = [asyncio.create_task(d.adjust_brightness(delta)) for d in DISPLAYS]
-        r = RetryAsync(
-            RetriableErr,
-            retries=0,
-            on_exception=(init_displays, OnErrOpts.RUN_ON_LAST_TRY),
-        )
+        r = get_retry(0, 0, on_exception=(init_displays, OnErrOpts.RUN_ON_LAST_TRY))
         f = lambda d: d.adjust_brightness(delta)
     else:
         return
@@ -258,7 +261,7 @@ async def execute_tasks(tasks: list[list]) -> None:
     await post_set(brightnesses, opts)
 
 
-async def post_set(brightnesses: list[int], opts) -> None:
+async def post_set(brightnesses: list[int], opts: Opts | int) -> None:
     brightnesses = sorted(brightnesses)
     if not opts & Opts.NO_TRACK and (brightnesses[-1] - brightnesses[0]) <= 1:
         CONF.state.last_set_brightness = brightnesses[0]
@@ -284,27 +287,27 @@ async def process_q() -> NoReturn:
             await execute_tasks(tasks)
 
 
-def handle_failure_after_retries(e: Exception):
+def handle_failure_after_retries(e: Exception) -> list[int | str]:
     if isinstance(e, PayloadErr):
         return e.payload
     return [1, str(e)]
 
 
-async def process_client_commands(err_event: Event) -> None:
+async def process_client_commands(err_fut: Future[None]) -> None:
     init_displays_retry_handler = get_retry(2, 0.3, True)
     init_displays_retry = partial(init_displays_retry_handler, init_displays)
     err_payload: list[int] = [1]
 
     # this wrapper is so exceptions from serve_forever() callbacks (which are not
     # awaited on) get propagated up to our taskgroup.
-    async def wrapped_client_connected_cb(*args):
+    async def wrapped_client_connected_cb(reader: StreamReader, writer: StreamWriter) -> None:
         try:
-            return await process_client_command(*args)
+            return await process_client_command(reader, writer)
         except ConnectionResetError:
             pass  # e.g. if client process is terminated during communication
         except Exception as error:
-            err_event.err = error
-            err_event.set()
+            if not err_fut.done():
+                err_fut.set_exception(error)
             raise
 
     async def disp_op[T](
@@ -317,7 +320,7 @@ async def process_client_commands(err_event: Event) -> None:
         results, displays = await display_op(op, disp_filter)
         return [0] if payload_creator is None else payload_creator(results, displays)
 
-    async def process_client_command(reader, writer) -> None:
+    async def process_client_command(reader: StreamReader, writer: StreamWriter) -> None:
         async def _close_socket() -> None:
             # self.logger.debug("closing the connection")
             writer.write_eof()
@@ -341,7 +344,7 @@ async def process_client_commands(err_event: Event) -> None:
             case ["get"]:
                 async with LOCK:
                     with suppress(RetriableErr):
-                        payload = [0, *get_brightness(0, False)]
+                        payload = [0, *get_brightness(0, ())]
             case ["get", opts, displays]:
                 async with LOCK:
                     with suppress(RetriableErr):
@@ -467,7 +470,9 @@ async def terminate() -> None:
 
 # note raw values only make sense when asked for specific or all displays, as
 # we can't really collate them into a single value as the scales potentially differ
-def get_brightness(opts, display_names) -> tuple[int] | list[tuple[str, int]]:
+def get_brightness(
+    opts: Opts | int, display_names: Sequence[str]
+) -> tuple[int] | list[tuple[str, int]]:
     filters: list[Callable[[Display], bool]] = []
     if opts:
         filters.append(get_disp_filter(opts))
@@ -493,7 +498,7 @@ def get_brightness(opts, display_names) -> tuple[int] | list[tuple[str, int]]:
 
     # either ignore last_set_brightness... {
     values: list[int] = [
-        d.get_brightness(no_offset_normalized=opts & Opts.GET_NO_OFFSET_NORMALIZED)
+        d.get_brightness(no_offset_normalized=bool(opts & Opts.GET_NO_OFFSET_NORMALIZED))
         for d in displays
     ]
     if same_values(values):
@@ -527,21 +532,20 @@ async def periodic_init(period: int) -> NoReturn:
             await TASK_QUEUE.put(["init", 1, 0.5])
 
 
-async def catch_err(err_event: Event) -> None:
-    await err_event.wait()
-    raise err_event.err
+async def catch_err(err_fut: Future[None]) -> None:
+    await err_fut  # re-raises the exception set by a client connection callback
 
 
 async def run() -> None:
     try:
         validate_ext_deps()
         await get_retry(5, 0.8)(init_displays)
-        err_event: Event = asyncio.Event()
+        err_fut: Future[None] = asyncio.get_running_loop().create_future()
 
         async with asyncio.TaskGroup() as tg:
             tg.create_task(process_q())
-            tg.create_task(catch_err(err_event))
-            tg.create_task(process_client_commands(err_event))
+            tg.create_task(catch_err(err_fut))
+            tg.create_task(process_client_commands(err_fut))
             if CONF.monitor_udev:
                 debounced = Debouncer(delay=CONF.udev_event_debounce_sec)
                 f = partial(debounced, TASK_QUEUE.put, ["init", 2, 0.5])
@@ -570,7 +574,7 @@ async def run() -> None:
             exit_code: int = CONF.fatal_exit_code
         LOGGER.debug(ee, stack_info=True, exc_info=True)
         LOGGER.debug(f"{type(ee).__name__} caught, exiting with code {exit_code}...")
-        if ee.notify:
+        if isinstance(ee, NotifyAwareErr) and ee.notify:  # ee may also be a nested ExceptionGroup
             await NOTIF.notify_err(ee)
         sys.exit(exit_code)
     except* SystemExit:

@@ -6,6 +6,7 @@ import logging
 import aiofiles as aiof
 from enum import StrEnum, auto
 from collections.abc import Iterable
+from typing import Any
 from pydash import py_
 from datetime import datetime
 from logging import Logger
@@ -239,7 +240,7 @@ def _read_json_bytes_from_file(file_loc: str) -> bytes:
         return b"{}"
 
 
-def _read_dict_from_file(file_loc: str) -> dict:
+def _read_dict_from_file(file_loc: str) -> dict[str, Any]:
     if not (os.path.isfile(file_loc) and os.access(file_loc, os.R_OK)):
         return {}
 

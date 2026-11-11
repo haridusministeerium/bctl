@@ -158,8 +158,8 @@ class Display(ABC):
 
     def get_brightness_for_opts(self, opts: Opts | int) -> int:
         self.logger.debug("getting brightness...")
-        return self._get_brightness(opts & Opts.GET_RAW,
-                                    opts & Opts.GET_NO_OFFSET_NORMALIZED)
+        return self._get_brightness(bool(opts & Opts.GET_RAW),
+                                    bool(opts & Opts.GET_NO_OFFSET_NORMALIZED))
 
     def _get_brightness(self, raw: bool, no_offset_normalized: bool) -> int:
         return (
@@ -190,7 +190,8 @@ class SimulatedDisplay(Display):
 
     def __init__(self, id: str, conf: Conf) -> None:
         super().__init__(id, DisplayType.SIM, BackendType.SIM, conf)
-        self.sim = self.conf.sim
+        assert conf.sim is not None, "simulated display requires sim config"
+        self.sim = conf.sim
 
     async def init(self) -> None:
         await asyncio.sleep(3)
