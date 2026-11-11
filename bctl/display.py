@@ -272,9 +272,9 @@ class BCTLDisplay(NonDDCDisplay):
     def __init__(self, bctl_out: str, conf: Conf) -> None:
         out = bctl_out.split(",")
         assert len(out) == 5, f"unexpected brightnessctl list output: [{bctl_out}]"
+        super().__init__(out[0], conf, BackendType.BRIGHTNESSCTL)
         self.raw_brightness = int(out[2])
         self.max_brightness = int(out[4])
-        super().__init__(out[0], conf, BackendType.BRIGHTNESSCTL)
 
     async def init(self) -> None:
         super()._init()
