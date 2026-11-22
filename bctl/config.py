@@ -5,7 +5,8 @@ import itertools
 import logging
 import aiofiles as aiof
 from enum import StrEnum, auto
-from collections.abc import Iterable
+from collections import Counter
+from collections.abc import Hashable, Iterable
 from typing import Any
 from pydash import py_
 from datetime import datetime
@@ -204,9 +205,8 @@ def _load_state(conf: Conf) -> State:
         return State()
 
 
-def find_dupes[T](i: Iterable[T]) -> list[T]:
-    j = sorted(i)
-    return list(set(j[::2]) & set(j[1::2]))
+def find_dupes[T: Hashable](i: Iterable[T]) -> list[T]:
+    return [k for k, count in Counter(i).items() if count > 1]
 
 
 # note this one doesn't flatten the input

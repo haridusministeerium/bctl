@@ -544,8 +544,11 @@ async def run() -> None:
             tg.create_task(process_client_commands(err_fut))
             if CONF.monitor_udev:
                 debounced = Debouncer(delay=CONF.udev_event_debounce_sec)
-                f = partial(debounced, TASK_QUEUE.put, ["init", 2, 0.5])
-                tg.create_task(monitor_udev_events("drm", "change", f))
+                tg.create_task(
+                    monitor_udev_events(
+                        "drm", "change", lambda: debounced(TASK_QUEUE.put, ["init", 2, 0.5])
+                    )
+                )
             if CONF.periodic_init_sec:
                 tg.create_task(periodic_init(CONF.periodic_init_sec))
 
