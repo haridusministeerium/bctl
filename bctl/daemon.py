@@ -43,9 +43,6 @@ from bctl.exceptions import (
 )
 from bctl.notify import Notif
 
-# RetryAsync.__call__ is annotated as returning Awaitable[Any] from an async def,
-# which would make awaited results Awaitable; this alias reflects the real behaviour
-type RetryFn = Callable[..., Coroutine[Any, Any, Any]]
 
 DISPLAYS: Sequence[Display] = []
 TASK_QUEUE: Queue[list[Any]]
@@ -60,21 +57,20 @@ LAST_INIT_TIME: int = 0
 def get_retry(
     retries: int,
     sleep: float | int,
-    on_exhaustion: bool | Callable[[Exception], Any] = False,
+    on_exhaustion: bool | Callable[[BaseException], Any] = False,
     on_exception: Callable[..., Awaitable[Any]]
     | tuple[Callable[..., Awaitable[Any]], OnErrOpts]
     | None = None,
-) -> RetryFn:
+) -> RetryAsync:
     return RetryAsync(
         RetriableErr,
         retries=retries,
         backoff=sleep,
-        # retry_deco types this callback as taking the exception class, but invokes it w/ the instance:
-        on_exhaustion=on_exhaustion,  # ty: ignore[invalid-argument-type]
+        on_exhaustion=on_exhaustion,
         on_exception=on_exception,
-    ).__call__
+    )
 
-NO_RETRY_NO_THROW: RetryFn = get_retry(0, 0, on_exhaustion=True)
+NO_RETRY_NO_THROW: RetryAsync = get_retry(0, 0, on_exhaustion=True)
 
 
 def validate_ext_deps() -> None:
@@ -174,7 +170,7 @@ async def display_op[T](
 async def execute_tasks(tasks: list[list]) -> None:
     delta: int = 0
     target: int | None = None
-    init_retry: RetryFn | None = None
+    init_retry: RetryAsync | None = None
     sync: bool = False
     opts: Opts | int = 0
     for t in tasks:
@@ -287,7 +283,7 @@ async def process_q() -> NoReturn:
             await execute_tasks(tasks)
 
 
-def handle_failure_after_retries(e: Exception) -> list[int | str]:
+def handle_failure_after_retries(e: BaseException) -> list[int | str]:
     if isinstance(e, PayloadErr):
         return e.payload
     return [1, str(e)]

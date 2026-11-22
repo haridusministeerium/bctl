@@ -10,7 +10,7 @@ dependencies = [
     "click", "tendo", "aiofiles",
     "pyudev", "desktop-notify",
     "pydantic", "pydash",
-    "retry-deco",
+    "retry-deco>=0.0.6",
     "dbus-next"  # note dbus-next is used by desktop-notify; preferably we'd like to switch over to dbus-fast, see https://gitlab.com/hxss-linux/desktop-notify/-/issues/3
 ]
 classifiers = [
