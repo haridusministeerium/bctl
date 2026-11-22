@@ -3,14 +3,13 @@ import json
 import os
 
 import pytest
+from conftest import FakeNotif
 
 from bctl import daemon
 from bctl.common import SOCKET_PATH, Opts
 from bctl.config import Conf, GetStrategy, State
 from bctl.display import DisplayType
 from bctl.exceptions import CmdErr, FatalErr, PayloadErr
-
-from conftest import FakeNotif
 
 
 @pytest.fixture

@@ -10,10 +10,10 @@ for _var in ("XDG_RUNTIME_DIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
     os.makedirs(_path)
     os.environ[_var] = _path
 
-import pytest  # noqa: E402
+import pytest
 
-from bctl.config import Conf, State  # noqa: E402
-from bctl.display import BackendType, Display, DisplayType  # noqa: E402
+from bctl.config import Conf, State
+from bctl.display import BackendType, Display, DisplayType
 
 
 def pytest_sessionfinish(session, exitstatus):

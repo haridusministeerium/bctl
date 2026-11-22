@@ -1,16 +1,19 @@
-import os
-import logging
 import asyncio
+import logging
+import os
+from abc import ABC, abstractmethod
+from asyncio import Task
+from collections.abc import Callable
+from enum import StrEnum, auto
+from logging import Logger
+from os import R_OK, W_OK
+from pathlib import Path
+from typing import TypeVar
+
 import aiofiles as aiof
 import aiofiles.os as aios
-from os import R_OK, W_OK
-from abc import abstractmethod, ABC
-from enum import StrEnum, auto
-from typing import TypeVar, Callable
-from asyncio import Task
-from pathlib import Path
-from logging import Logger
-from bctl.common import run_cmd, wait_and_reraise, Opts
+
+from bctl.common import Opts, run_cmd, wait_and_reraise
 from bctl.config import Conf, OffsetType, SimConf
 from bctl.exceptions import ExitableErr, FatalErr
 
@@ -235,7 +238,7 @@ class DDCDisplay(Display):
             "--bus",
             self.bus,
         ]
-        out, err, code = await run_cmd(cmd, self.logger, throw_on_err=True)
+        out, _err, _code = await run_cmd(cmd, self.logger, throw_on_err=True)
         out = out.split()
         assert len(out) == 5, f"{cmd} output unexpected: {out}"
         self.raw_brightness = int(out[-2])
@@ -257,7 +260,7 @@ class DDCDisplay(Display):
         )
 
     async def _get_vcp_feature(self, args: list[str]) -> str:
-        out, err, code = await run_cmd(
+        out, _err, _code = await run_cmd(
             ["ddcutil"]
             + self.conf.ddcutil_gvcp_flags
             + ["getvcp"]
@@ -303,7 +306,7 @@ class BrilloDisplay(NonDDCDisplay):
         super()._init()
 
     async def _get_device_attr(self, attr: str) -> int:
-        out, err, code = await run_cmd(
+        out, _err, _code = await run_cmd(
             ["brillo", "-s", self.id, f"-rlG{attr}"],
             self.logger,
             throw_on_err=True,

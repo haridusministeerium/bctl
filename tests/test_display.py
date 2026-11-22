@@ -1,4 +1,7 @@
+from typing import ClassVar
+
 import pytest
+from conftest import FakeDisplay
 
 from bctl.common import Opts
 from bctl.config import Conf, OffsetConf, OffsetType, State
@@ -11,8 +14,6 @@ from bctl.display import (
     get_disp_filter,
 )
 from bctl.exceptions import FatalErr
-
-from conftest import FakeDisplay
 
 
 def offset_conf(offsets: dict[str, int], type=OffsetType.HARD, **kwargs) -> Conf:
@@ -185,7 +186,7 @@ def test_non_ddc_display_type_from_id(conf, id, expected):
 
 
 class TestDDCDisplay:
-    BLOCK = ["Display 1", "I2C bus:  /dev/i2c-11", "DRM connector:    card1-DP-1", "Monitor:   AUS:PA278QV:L9GMQA215221"]
+    BLOCK: ClassVar[list[str]] = ["Display 1", "I2C bus:  /dev/i2c-11", "DRM connector:    card1-DP-1", "Monitor:   AUS:PA278QV:L9GMQA215221"]
 
     @pytest.fixture
     def cmds(self, monkeypatch):

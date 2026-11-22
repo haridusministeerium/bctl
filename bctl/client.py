@@ -1,14 +1,15 @@
 import asyncio
+import json
 import logging
 import sys
-import json
 from asyncio import StreamReader, StreamWriter
 from logging import Logger
 from typing import Any, NoReturn
+
 from bctl.common import SOCKET_PATH
 
 
-class Client(object):
+class Client:
     """Client to send commands over socket to the daemon"""
 
     def __init__(self, debug: bool = False) -> None:

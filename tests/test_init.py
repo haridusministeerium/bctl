@@ -1,11 +1,10 @@
 import pytest
+from conftest import FakeDisplay
 
 from bctl import init
 from bctl.config import Conf, MainDisplayCtl, OffsetConf, State
 from bctl.display import DDCDisplay, DisplayType
 from bctl.exceptions import CmdErr, FatalErr
-
-from conftest import FakeDisplay
 
 DDCUTIL_DETECT = """\
 Invalid display

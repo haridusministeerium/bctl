@@ -1,23 +1,25 @@
-import os
 import glob
-import json
 import itertools
+import json
 import logging
-import aiofiles as aiof
-from enum import StrEnum, auto
+import os
 from collections import Counter
 from collections.abc import Hashable, Iterable
-from typing import Any
-from pydash import py_
 from datetime import datetime
+from enum import StrEnum, auto
 from logging import Logger
+from typing import Any
+
+import aiofiles as aiof
 from pydantic import BaseModel
 from pydantic.types import (
-    PositiveInt,
+    NonNegativeFloat,
     NonNegativeInt,
     PositiveFloat,
-    NonNegativeFloat,
+    PositiveInt,
 )
+from pydash import py_
+
 from bctl.common import CACHE_PATH
 from bctl.exceptions import FatalErr
 
@@ -200,9 +202,9 @@ def _load_state(conf: Conf) -> State:
         if is_state_young_enough and v == STATE_VER:
             LOGGER.debug(f"hydrated state from disk: {s}")
             return s
-        raise
-    except Exception:
-        return State()
+    except Exception as e:  # noqa: BLE001
+        LOGGER.debug(f"failed to load state from disk: {e}")
+    return State()
 
 
 def find_dupes[T: Hashable](i: Iterable[T]) -> list[T]:
@@ -224,7 +226,7 @@ async def write_state(conf: Conf) -> None:
         async with aiof.open(conf.state_f_path, mode="w") as f:
             await f.write(payload)
         LOGGER.debug("...state stored")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         LOGGER.error(f"...state storing failed: {e}")
 
 
@@ -235,7 +237,7 @@ def _read_json_bytes_from_file(file_loc: str) -> bytes:
     try:
         with open(file_loc, "rb") as f:
             return f.read()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         LOGGER.error(f"error trying to read json as bytes from {file_loc}: {e}")
         return b"{}"
 
@@ -247,7 +249,7 @@ def _read_dict_from_file(file_loc: str) -> dict[str, Any]:
     try:
         with open(file_loc, "r") as f:
             return json.load(f)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         LOGGER.error(f"error trying to parse json from {file_loc}: {e}")
         return {}
 

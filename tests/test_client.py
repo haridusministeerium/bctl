@@ -1,6 +1,7 @@
 import json
 import socket
 import threading
+from typing import ClassVar
 
 import pytest
 from click.testing import CliRunner
@@ -12,7 +13,7 @@ from bctl.common import Opts
 
 
 class RecordingClient:
-    sent: list[tuple[str, list]] = []
+    sent: ClassVar[list[tuple[str, list]]] = []
 
     def __init__(self, debug=False):
         pass

@@ -1,42 +1,42 @@
-import glob
-import os
-from pathlib import Path
-import aiofiles.os as aios
-import re
-import logging
 import asyncio
+import glob
+import logging
+import os
+import re
 from asyncio import Task
+from collections.abc import Callable, Sequence
 from logging import Logger
+from pathlib import Path
+
+import aiofiles.os as aios
+
 from bctl.common import (
+    Opts,
     run_cmd,
     wait_and_reraise,
-    Opts,
-)
-from typing import Callable
-from collections.abc import Sequence
-from bctl.display import (
-    BackendType,
-    DisplayType,
-    Display,
-    SimulatedDisplay,
-    DDCDisplay,
-    BCTLDisplay,
-    BrilloDisplay,
-    RawDisplay,
-    TNonDDCDisplay,
-    TDisplay,
-    get_disp_filter,
 )
 from bctl.config import (
     Conf,
-    MainDisplayCtl,
     InternalDisplayCtl,
+    MainDisplayCtl,
+)
+from bctl.display import (
+    BackendType,
+    BCTLDisplay,
+    BrilloDisplay,
+    DDCDisplay,
+    Display,
+    DisplayType,
+    RawDisplay,
+    SimulatedDisplay,
+    TDisplay,
+    TNonDDCDisplay,
+    get_disp_filter,
 )
 from bctl.exceptions import (
-    FatalErr,
     CmdErr,
+    FatalErr,
 )
-
 
 LOGGER: Logger = logging.getLogger(__name__)
 
@@ -166,7 +166,7 @@ async def get_raw_displays(conf: Conf) -> list[RawDisplay]:
 
 
 async def get_brillo_displays(conf: Conf) -> list[BrilloDisplay]:
-    out, err, code = await run_cmd(["brillo", "-Ll"], LOGGER, throw_on_err=True)
+    out, _err, _code = await run_cmd(["brillo", "-Ll"], LOGGER, throw_on_err=True)
     out = out.splitlines()
     assert len(out) > 0, "no backlight-capable devices found w/ brillo"
 
@@ -179,7 +179,7 @@ async def get_brillo_displays(conf: Conf) -> list[BrilloDisplay]:
 
 async def get_bctl_displays(conf: Conf) -> list[BCTLDisplay]:
     cmd = ["brightnessctl", "--list", "--machine-readable", "--class=backlight"]
-    out, err, code = await run_cmd(cmd, LOGGER, throw_on_err=True)
+    out, _err, _code = await run_cmd(cmd, LOGGER, throw_on_err=True)
     out = out.splitlines()
     assert len(out) > 0, "no backlight-capable devices found w/ brightnessctl"
 

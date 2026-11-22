@@ -1,39 +1,39 @@
 import asyncio
-import traceback
-import signal
-import sys
 import json
 import logging
-from functools import partial
-from pydantic.types import PositiveInt
-from retry_deco import RetryAsync, OnErrOpts
-from logging import Logger
-from types import TracebackType
-from asyncio import AbstractEventLoop, Task, Queue, Lock, Future, StreamReader, StreamWriter
-from typing import NoReturn, Callable, Coroutine, Any
-from collections.abc import Awaitable, Sequence
-from tendo import singleton
-from statistics import fmean
+import signal
+import sys
+import traceback
+from asyncio import AbstractEventLoop, Future, Lock, Queue, StreamReader, StreamWriter, Task
+from collections.abc import Awaitable, Callable, Coroutine, Sequence
 from contextlib import suppress
-from bctl.init import resolve_displays
-from bctl.debouncer import Debouncer
-from bctl.udev_monitor import monitor_udev_events
-from bctl.display import BackendType, DisplayType, Display, get_disp_filter
+from functools import partial
+from logging import Logger
+from statistics import fmean
+from types import TracebackType
+from typing import Any, NoReturn
+
+from pydantic.types import PositiveInt
+from retry_deco import OnErrOpts, RetryAsync
+from tendo import singleton
+
 from bctl.common import (
-    same_values,
-    assert_cmd_exist,
-    wait_and_reraise,
-    Opts,
     SOCKET_PATH,
+    Opts,
+    assert_cmd_exist,
+    same_values,
+    wait_and_reraise,
 )
 from bctl.config import (
     Conf,
+    GetStrategy,
     SimConf,
     load_config,
-    write_state,
     unix_time_now,
-    GetStrategy,
+    write_state,
 )
+from bctl.debouncer import Debouncer
+from bctl.display import BackendType, Display, DisplayType, get_disp_filter
 from bctl.exceptions import (
     ExitableErr,
     FatalErr,
@@ -41,8 +41,9 @@ from bctl.exceptions import (
     PayloadErr,
     RetriableErr,
 )
+from bctl.init import resolve_displays
 from bctl.notify import Notif
-
+from bctl.udev_monitor import monitor_udev_events
 
 DISPLAYS: Sequence[Display] = []
 TASK_QUEUE: Queue[list[Any]]
@@ -56,7 +57,7 @@ LAST_INIT_TIME: int = 0
 
 def get_retry(
     retries: int,
-    sleep: float | int,
+    sleep: float,
     on_exhaustion: bool | Callable[[BaseException], Any] = False,
     on_exception: Callable[..., Awaitable[Any]]
     | tuple[Callable[..., Awaitable[Any]], OnErrOpts]
@@ -235,7 +236,7 @@ async def execute_tasks(tasks: list[list]) -> None:
     try:
         brightnesses, _ = await r(display_op, f, get_disp_filter(opts))
         LOGGER.debug(f"...executed {number_tasks}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         LOGGER.error(f"...error executing tasks: {e}")
         return
 
@@ -578,7 +579,7 @@ async def run() -> None:
         sys.exit(exit_code)
     except* SystemExit:
         raise
-    except* Exception as exc_group:
+    except* Exception as exc_group:  # noqa: BLE001
         LOGGER.error("caught following unhandled errors in exc_group:")
         for i, e in enumerate(exc_group.exceptions):
             LOGGER.error(f"{i}.: {e}")

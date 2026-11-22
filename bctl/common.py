@@ -1,10 +1,11 @@
-import os
 import asyncio
+import os
 import shutil
-from collections.abc import Sequence, Iterable
+from collections.abc import Iterable, Sequence
 from enum import IntFlag
 from logging import Logger
-from bctl.exceptions import FatalErr, CmdErr, ExitableErr
+
+from bctl.exceptions import CmdErr, ExitableErr, FatalErr
 
 
 class Opts(IntFlag):
