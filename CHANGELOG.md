@@ -1,4 +1,4 @@
-## 0.0.13 (unreleased)
+## 0.0.13 (2026-11-22)
 ----------------------
 
 - replace abandoned desktop-notify & dbus-next dependencies with dbus-fast;
