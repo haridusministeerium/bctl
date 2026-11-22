@@ -1,7 +1,8 @@
 ## 0.0.13 (unreleased)
 ----------------------
 
-- Nothing changed yet.
+- replace abandoned desktop-notify & dbus-next dependencies with dbus-fast;
+  fixes daemon failing to start on Python 3.15
 
 
 ## 0.0.12 (2026-04-27)

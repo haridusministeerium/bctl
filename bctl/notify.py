@@ -1,19 +1,22 @@
-# see also following for simple notif over dbus: https://ramit-mitra.medium.com/post-a-custom-notification-in-linux-using-python-951e1d273b79
-from dbus_next import Variant
-from desktop_notify.aio import Server as AioNotifServer
+from typing import Any
+
+from dbus_fast import Message, MessageType, Variant
+from dbus_fast.aio import MessageBus
 
 from bctl.config import NotifyConf, NotifyIconConf
 
-# from desktop_notify.glib import Server as SyncNotifSerer
+APP_NAME = "bctld"
+# spec @ https://specifications.freedesktop.org/notification-spec/latest/
+NOTIF_BUS = "org.freedesktop.Notifications"
+NOTIF_PATH = "/org/freedesktop/Notifications"
+NOTIF_SIGNATURE = "susssasa{sv}i"  # app_name, replaces_id, app_icon, summary, body, actions, hints, expire_timeout
 
 
 class Notif:
     def __init__(self, conf: NotifyConf) -> None:
         self.conf: NotifyConf = conf
         self.icon_conf: NotifyIconConf = conf.icon
-        self.notif: AioNotifServer | None = (
-            AioNotifServer("bctld") if conf.enabled else None
-        )
+        self._bus: MessageBus | None = None
 
     # icon spec @ https://specifications.freedesktop.org/icon-theme-spec/latest/
     def _get_notif_icon(self, val: int) -> str:
@@ -33,40 +36,38 @@ class Notif:
             i_root += "/"
         return i_root + icon
 
-    async def notify_err(self, err: Exception) -> None:
-        if self.notif is None or not self.conf.on_fatal_err:
-            return
-
-        notify = (
-            self.notif.Notify("bctl", str(err))
-            .set_icon(self.icon_conf.error)
-            .set_timeout(0)
+    async def _notify(
+        self, summary: str, body: str, icon: str, hints: dict[str, Variant], timeout_ms: int
+    ) -> None:
+        if self._bus is None or not self._bus.connected:
+            self._bus = await MessageBus().connect()
+        args: list[Any] = [APP_NAME, 0, icon, summary, body, [], hints, timeout_ms]
+        reply = await self._bus.call(
+            Message(
+                destination=NOTIF_BUS,
+                path=NOTIF_PATH,
+                interface=NOTIF_BUS,
+                member="Notify",
+                signature=NOTIF_SIGNATURE,
+                body=args,
+            )
         )
-        await notify.show()
+        if reply.message_type is MessageType.ERROR:
+            raise RuntimeError(f"desktop notification failed: {reply.error_name}: {reply.body}")
+
+    async def notify_err(self, err: Exception) -> None:
+        if not self.conf.enabled or not self.conf.on_fatal_err:
+            return
+        await self._notify("bctl", str(err), self.icon_conf.error, {}, 0)  # timeout 0 = never expire
 
     # note as per https://wiki.archlinux.org/title/Desktop_notifications#Replace_previous_notification
     # 'string:x-canonical-private-synchronous:' hint is for replacing existing notification
     # the same way referencing it by ID does
     async def notify_change(self, val: int) -> None:
-        if self.notif is None:
+        if not self.conf.enabled:
             return
-
-        notify = (
-            self.notif.Notify(str(val))
-            .set_hint("value", Variant("i", val))
-            .set_hint(
-                "x-canonical-private-synchronous", Variant("s", "brightness_bctld")
-            )
-            .set_icon(self._get_notif_icon(val))
-            .set_timeout(self.conf.timeout_ms)
-        )
-            # .set_id(1002)
-        await notify.show()
-
-    # desktop-notify's glib module seems broken
-    # def notify_err_sync(self, err: Exception) -> None:
-        # if self.notif is None or not self.conf.on_fatal_err: return
-        # notif = SyncNotifSerer('bctl')
-        # notif = notif.Notify(str(err))
-        # notif.show()
-
+        hints = {
+            "value": Variant("i", val),
+            "x-canonical-private-synchronous": Variant("s", "brightness_bctld"),
+        }
+        await self._notify(str(val), "", self._get_notif_icon(val), hints, self.conf.timeout_ms)
